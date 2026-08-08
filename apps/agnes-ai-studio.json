@@ -8,6 +8,7 @@
   "run_as": "package",
   "install_type": "",
   "is_docker": true,
+  "service_port": "5000",
   "releases": {
     "1.0.0": {
       "packages": {
