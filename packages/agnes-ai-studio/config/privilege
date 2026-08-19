@@ -1,0 +1,8 @@
+{
+    "defaults":
+    {
+        "run-as": "package"
+    },
+    "username": "docker-agnes-ai-studio",
+    "groupname": "docker-agnes-ai-studio"
+}

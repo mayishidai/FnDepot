@@ -1,0 +1,8 @@
+appname      = agnes-ai-studio
+version      = 1.0.0
+display_name = Agnes AI Studio
+desc         = 通过 Web UI 实现文生图、图生图、文生视频、图文生视频，调用 Agnes AI 免费图像/视频生成模型。需自备 Agnes AI API Key（在设置页填写）。
+platform     = x86
+source       = thirdparty
+maintainer   = mayishidai
+distributor  = mayishidai

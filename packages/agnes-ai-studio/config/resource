@@ -1,0 +1,26 @@
+{
+  "docker-project": {
+    "projects": [
+      {
+        "name": "agnes-ai-studio",
+        "path": "docker"
+      }
+    ]
+  },
+  "data-share": {
+    "shares": [
+      {
+        "name": "config"
+      },
+      {
+        "name": "videos"
+      },
+      {
+        "name": "pictures"
+      },
+      {
+        "name": "dramas"
+      }
+    ]
+  }
+}

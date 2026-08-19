@@ -1,0 +1,95 @@
+name: Build & Release FPK
+
+# 每次打 tag vX.Y.Z 即自动：构建 fpk → 计算 sha256/size → 回填元数据 → 发布 GitHub Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  FNPACK_VERSION: "1.2.3"
+  FNPACK_SHA256: "54b97fa7b70968c4d05c79840f5daeff508957d0bb2062fdb0376d00d9615c93"
+
+jobs:
+  build-fpk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION (tag ${{ github.ref_name }})"
+
+      - name: Install verified fnpack
+        run: |
+          URL="https://static2.fnnas.com/fnpack/fnpack-${FNPACK_VERSION}-linux-amd64"
+          curl -fsSL -o fnpack "$URL"
+          ACTUAL=$(sha256sum fnpack | awk '{print $1}')
+          if [ "$ACTUAL" != "$FNPACK_SHA256" ]; then
+            echo "::error::fnpack sha256 mismatch (got $ACTUAL)"
+            exit 1
+          fi
+          chmod +x fnpack
+          sudo mv fnpack /usr/local/bin/fnpack
+          fnpack --help
+
+      - name: Stamp version into manifest
+        run: |
+          sed -i "s/^version .*/version      = ${{ steps.ver.outputs.version }}/" packages/agnes-ai-studio/manifest
+          grep '^version' packages/agnes-ai-studio/manifest
+
+      - name: Build FPK
+        run: |
+          cd packages/agnes-ai-studio
+          fnpack build
+          ls -la *.fpk
+
+      - name: Compute checksum & size
+        id: pkg
+        run: |
+          FPK="packages/agnes-ai-studio/agnes-ai-studio.fpk"
+          echo "path=$FPK" >> "$GITHUB_OUTPUT"
+          echo "sha=$(sha256sum "$FPK" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "size=$(stat -c%s "$FPK")" >> "$GITHUB_OUTPUT"
+
+      - name: Update release metadata
+        run: |
+          python3 scripts/update_release_meta.py \
+            --version "${{ steps.ver.outputs.version }}" \
+            --tag "${{ github.ref_name }}" \
+            --sha "${{ steps.pkg.outputs.sha }}" \
+            --size "${{ steps.pkg.outputs.size }}"
+
+      - name: Commit metadata back
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/agnes-ai-studio.json packages/agnes-ai-studio/manifest
+          git commit -m "chore(release): agnes-ai-studio ${{ steps.ver.outputs.version }}" || echo "no metadata changes"
+          git push origin HEAD:main
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.pkg.outputs.path }}
+          name: Agnes AI Studio ${{ steps.ver.outputs.version }}
+          body: |
+            ## Agnes AI Studio ${{ steps.ver.outputs.version }}
+
+            - **安装包**：`agnes-ai-studio.fpk`（飞牛 fnOS 应用中心 → 手动安装）
+            - **容器镜像**：`ghcr.io/mayishidai/agnes-ai-studio:latest`
+            - **SHA256**：`${{ steps.pkg.outputs.sha }}`
+            - **大小**：${{ steps.pkg.outputs.size }} 字节
+
+            > 在飞牛 fnOS「应用中心」开启手动安装后，上传本 Release 的 `.fpk` 即可安装。
+          draft: false
+          prerelease: false

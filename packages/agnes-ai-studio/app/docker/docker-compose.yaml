@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  agnes-ai-studio:
+    image: ghcr.io/mayishidai/agnes-ai-studio:latest
+    container_name: agnes-ai-studio
+    ports:
+      - "{host_port}:5000"
+    volumes:
+      - "/var/apps/agnes-ai-studio/shares/config:/app/config"
+      - "/var/apps/agnes-ai-studio/shares/videos:/app/videos"
+      - "/var/apps/agnes-ai-studio/shares/pictures:/app/pictures"
+      - "/var/apps/agnes-ai-studio/shares/dramas:/app/dramas"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
