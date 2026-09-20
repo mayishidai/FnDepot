@@ -2,3 +2,4 @@
 *.fpk
 data/
 .DS_Store
+.workbuddy/

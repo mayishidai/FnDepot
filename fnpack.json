@@ -2,12 +2,14 @@
   "schema_version": "2",
   "source_info": {
     "name": "Agnes FnOS 应用源",
-    "author": "mayishidai"
+    "author": "mayishidai",
+    "homepage": "https://github.com/mayishidai/FnDepot",
+    "description": "面向飞牛 fnOS 的个人第三方应用源，提供自建与打包的应用安装包。"
   },
   "apps": {
     "agnes-ai-studio": {
       "details_url": "apps/agnes-ai-studio.json",
-      "details_updated_at": "2026-08-08T22:00:00+08:00"
+      "details_updated_at": "2026-09-20T16:30:00+08:00"
     }
   }
 }

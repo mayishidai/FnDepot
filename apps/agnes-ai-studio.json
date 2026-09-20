@@ -3,22 +3,25 @@
   "display_name": "Agnes AI Studio",
   "desc": "通过 Web UI 实现文生图、图生图、文生视频、图文生视频，调用 Agnes AI 免费图像/视频生成模型。需自备 Agnes AI API Key（在设置页填写）。",
   "platform": [
-    "x86",
-    "arm"
+    "x86"
   ],
   "categories": [
     "AI赋能"
   ],
-  "icon_url": "https://raw.githubusercontent.com/mayishidai/fnos-app-depot/main/assets/icons/agnes-ai-studio.png",
+  "icon_url": "../assets/icons/agnes-ai-studio.png",
+  "maintainer": "mayishidai",
+  "maintainer_url": "https://github.com/mayishidai",
   "run_as": "package",
   "install_type": "",
   "is_docker": true,
   "service_port": "5000",
   "releases": {
     "1.0.0": {
+      "changelog": "首个版本。通过 Web UI 提供文生图、图生图、文生视频、图文生视频能力。",
+      "updated_at": "2026-08-08T22:00:00+08:00",
       "packages": {
-        "all": {
-          "download_url": "https://github.com/mayishidai/fnos-app-depot/releases/download/v1.0.0/agnes-ai-studio.fpk",
+        "x86": {
+          "download_url": "https://github.com/mayishidai/FnDepot/releases/download/v1.0.0/agnes-ai-studio.fpk",
           "sha256": "06a749cc7b2495b711f3778042d682c2d1b6eaaddd97638d5231670d71a597be",
           "size": 24579
         }

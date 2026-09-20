@@ -1,10 +1,19 @@
 name: Build & Release FPK
 
-# 每次打 tag vX.Y.Z 即自动：构建 fpk → 计算 sha256/size → 回填元数据 → 发布 GitHub Release
+# 每次打 tag vX.Y.Z 即自动：
+#   1) 扫描 packages/ 下的所有应用 → 2) 逐个构建 fpk → 3) 计算 sha256/size
+#   → 4) 回填元数据 → 5) 按 V2 规范校验 → 6) 提交元数据 → 7) 发布 GitHub Release
+#
+# 新增应用无需改本文件：只要 packages/<appid>/ 与 apps/<appid>.json 存在即自动纳入。
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（如 v1.0.0），需已存在'
+        required: true
 
 permissions:
   contents: write
@@ -14,8 +23,13 @@ env:
   FNPACK_SHA256: "54b97fa7b70968c4d05c79840f5daeff508957d0bb2062fdb0376d00d9615c93"
 
 jobs:
-  build-fpk:
+  # ---------- 第一步：发现所有应用，产出 matrix ----------
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.scan.outputs.apps }}
+      version: ${{ steps.ver.outputs.version }}
+      tag: ${{ steps.ver.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,9 +39,57 @@ jobs:
       - name: Resolve version from tag
         id: ver
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Release version: $VERSION (tag ${{ github.ref_name }})"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $TAG"
+
+      - name: Discover packaged apps
+        id: scan
+        run: |
+          APPS=$(python3 - <<'PY'
+          import json, os, sys
+
+          root = "packages"
+          found = []
+          for appid in sorted(os.listdir(root)):
+              d = os.path.join(root, appid)
+              if not os.path.isdir(d):
+                  continue
+              if not os.path.exists(os.path.join(d, "manifest")):
+                  print(f"::warning::{appid} 缺少 manifest，跳过", file=sys.stderr)
+                  continue
+              if not os.path.exists(os.path.join("apps", f"{appid}.json")):
+                  print(f"::warning::apps/{appid}.json 不存在，跳过", file=sys.stderr)
+                  continue
+              found.append(appid)
+
+          if not found:
+              sys.exit("packages/ 下没有可发布的合法应用")
+
+          print(json.dumps(found))
+          PY
+          )
+          echo "apps=$APPS" >> "$GITHUB_OUTPUT"
+          echo "Discovered apps: $APPS"
+
+  # ---------- 第二步：逐应用构建并回填元数据 ----------
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.discover.outputs.apps) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install verified fnpack
         run: |
@@ -44,19 +106,22 @@ jobs:
 
       - name: Stamp version into manifest
         run: |
-          sed -i "s/^version .*/version      = ${{ steps.ver.outputs.version }}/" packages/agnes-ai-studio/manifest
-          grep '^version' packages/agnes-ai-studio/manifest
+          MANIFEST="packages/${{ matrix.app }}/manifest"
+          sed -i "s/^\(version[[:space:]]*=\).*/\1 ${{ needs.discover.outputs.version }}/" "$MANIFEST"
+          grep '^version' "$MANIFEST"
 
       - name: Build FPK
         run: |
-          cd packages/agnes-ai-studio
+          cd "packages/${{ matrix.app }}"
           fnpack build
           ls -la *.fpk
 
       - name: Compute checksum & size
         id: pkg
         run: |
-          FPK="packages/agnes-ai-studio/agnes-ai-studio.fpk"
+          FPK="packages/${{ matrix.app }}/${{ matrix.app }}.fpk"
+          test -f "$FPK" || { echo "::error::未找到 $FPK"; exit 1; }
+          # 单架构：只有一枚 fpk；多架构（<appid>_<arch>.fpk）需在本步骤扩展
           echo "path=$FPK" >> "$GITHUB_OUTPUT"
           echo "sha=$(sha256sum "$FPK" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "size=$(stat -c%s "$FPK")" >> "$GITHUB_OUTPUT"
@@ -64,32 +129,135 @@ jobs:
       - name: Update release metadata
         run: |
           python3 scripts/update_release_meta.py \
-            --version "${{ steps.ver.outputs.version }}" \
-            --tag "${{ github.ref_name }}" \
+            --app "${{ matrix.app }}" \
+            --version "${{ needs.discover.outputs.version }}" \
+            --tag "${{ needs.discover.outputs.tag }}" \
             --sha "${{ steps.pkg.outputs.sha }}" \
             --size "${{ steps.pkg.outputs.size }}"
+
+      - name: Verify source against FnDepot V2 spec
+        run: python3 scripts/verify_source.py
+
+      - name: Stage metadata changes
+        run: |
+          cp "packages/${{ matrix.app }}/manifest" "/tmp/manifest-${{ matrix.app }}.bak"
+          git diff --stat
+
+      - name: Upload FPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fpk-${{ matrix.app }}
+          path: ${{ steps.pkg.outputs.path }}
+
+      - name: Upload staged metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: meta-${{ matrix.app }}
+          path: |
+            apps/${{ matrix.app }}.json
+            packages/${{ matrix.app }}/manifest
+
+  # ---------- 第三步：汇总提交元数据（单点写入，避免多 job 抢推） ----------
+  commit-metadata:
+    needs: [discover, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all staged metadata
+        uses: actions/download-artifact@v4
+        with:
+          pattern: meta-*
+          path: staged
+
+      - name: Apply metadata back to working tree
+        run: |
+          shopt -s globstar nullglob
+          for f in staged/**/apps/*.json; do
+            [ -e "$f" ] || continue
+            dest="apps/$(basename "$f")"
+            cp "$f" "$dest"
+            echo "applied $dest"
+          done
+          for f in staged/**/packages/*/manifest; do
+            [ -e "$f" ] || continue
+            appid="$(basename "$(dirname "$f")")"
+            dest="packages/$appid/manifest"
+            cp "$f" "$dest"
+            echo "applied $dest"
+          done
+
+      - name: Verify source against FnDepot V2 spec
+        run: python3 scripts/verify_source.py
 
       - name: Commit metadata back
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apps/agnes-ai-studio.json packages/agnes-ai-studio/manifest
-          git commit -m "chore(release): agnes-ai-studio ${{ steps.ver.outputs.version }}" || echo "no metadata changes"
-          git push origin HEAD:main
+          git add apps packages/*/manifest
+          if git diff --cached --quiet; then
+            echo "no metadata changes"
+          else
+            git commit -m "chore(release): ${{ needs.discover.outputs.version }} 元数据回填"
+            git push origin HEAD:main
+          fi
+
+  # ---------- 第四步：发布 Release（汇总所有 fpk） ----------
+  release:
+    needs: [discover, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all FPK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fpk-*
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist
+
+      - name: Build release body
+        id: body
+        run: |
+          BODY=$(python3 - <<'PY'
+          import json, os
+
+          apps = json.loads(os.environ["APPS"])
+          lines = ["| 应用 | 安装包 | 大小 |", "| --- | --- | --- |"]
+          for name in apps:
+              f = f"dist/{name}.fpk"
+              size = f"{os.path.getsize(f):,} B" if os.path.exists(f) else "—"
+              lines.append(f"| `{name}` | `{name}.fpk` | {size} |")
+          print("\n".join(lines))
+          PY
+          )
+          {
+            echo "body<<RELEASE_BODY_EOF"
+            echo "## 发布 ${{ needs.discover.outputs.version }}"
+            echo ""
+            echo "$BODY"
+            echo ""
+            echo "### 安装方式"
+            echo "飞牛 fnOS「应用中心」→ 开启手动安装 → 上传对应 \`.fpk\`。"
+            echo ""
+            echo "### 文件校验"
+            echo "每个 \`.fpk\` 的 SHA256 与大小已由 CI 回填至仓库 \`apps/<appid>.json\`，"
+            echo "客户端会做强制校验，请勿手工修改已发布版本的任何字段。"
+            echo "RELEASE_BODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          APPS: ${{ needs.discover.outputs.apps }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.pkg.outputs.path }}
-          name: Agnes AI Studio ${{ steps.ver.outputs.version }}
-          body: |
-            ## Agnes AI Studio ${{ steps.ver.outputs.version }}
-
-            - **安装包**：`agnes-ai-studio.fpk`（飞牛 fnOS 应用中心 → 手动安装）
-            - **容器镜像**：`ghcr.io/mayishidai/agnes-ai-studio:latest`
-            - **SHA256**：`${{ steps.pkg.outputs.sha }}`
-            - **大小**：${{ steps.pkg.outputs.size }} 字节
-
-            > 在飞牛 fnOS「应用中心」开启手动安装后，上传本 Release 的 `.fpk` 即可安装。
+          tag_name: ${{ needs.discover.outputs.tag }}
+          files: dist/*.fpk
+          name: ${{ needs.discover.outputs.tag }}
+          body: ${{ steps.body.outputs.body }}
           draft: false
           prerelease: false
