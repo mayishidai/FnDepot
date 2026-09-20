@@ -4,8 +4,8 @@
 #
 # 在「一个仓库多个应用」结构下，输入少量参数即可生成某应用所需的全部文件：
 #   - apps/<appid>.json                应用详情（FnDepot V2 拆分模式）
-#   - packages/<appid>/                FPK 打包工程（fnpack 直接可 build）
-#   - docker-compose.<appid>.yml       手动 docker-compose 部署
+#   - packages/<appid>/                FPK 打包工程（fnpack 直接可 build，
+#                                      内含 app/docker/docker-compose.yaml 一份 compose）
 #   - assets/icons/<appid>.png         占位图标（纯标准库生成，无需 PIL）
 #   并写回 fnpack.json 索引。
 #
@@ -311,26 +311,7 @@ for path, size, color, alpha in targets:
 PY
 
 # ============================================================
-# 4) 手动 docker-compose 部署文件
-# ============================================================
-cat > "$REPO_ROOT/docker-compose.$APPID.yml" <<YML
-version: "3.8"
-
-services:
-  $APPID:
-    image: ghcr.io/$GITHUB_USER/$APPID:latest
-    container_name: $APPID
-    ports:
-      - "$PORT:$PORT"
-    volumes:
-      - ./data/$APPID:/app/config
-    environment:
-      - PYTHONUNBUFFERED=1
-    restart: unless-stopped
-YML
-
-# ============================================================
-# 5) 写回 fnpack.json 索引
+# 4) 写回 fnpack.json 索引
 # ============================================================
 python3 - "$REPO_ROOT/fnpack.json" "$APPID" "$NOW" <<'PY'
 import json, sys
@@ -357,7 +338,6 @@ cat <<DONE
   FPK 工程     packages/$APPID/          (manifest + cmd/ + config/ + app/docker/ + wizard/)
   占位图标     assets/icons/$APPID.png
                packages/$APPID/ICON.PNG, ICON_256.PNG
-  手动部署     docker-compose.$APPID.yml
 
 后续步骤：
   1) 编辑 apps/$APPID.json 与 packages/$APPID/manifest，补全 desc 等描述
