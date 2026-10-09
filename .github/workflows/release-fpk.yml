@@ -1,10 +1,12 @@
 name: Build & Release FPK
 
-# 每次打 tag vX.Y.Z 即自动：
-#   1) 扫描 packages/ 下的所有应用 → 2) 逐个构建 fpk → 3) 计算 sha256/size
-#   → 4) 回填元数据 → 5) 按 V2 规范校验 → 6) 提交元数据 → 7) 发布 GitHub Release
+# 打 tag vX.Y.Z 即自动：
+#   1) 扫描 packages/ 下的应用，并筛出相对上一个 tag 有改动的
+#   2) 逐个构建 fpk → 3) 回填 sha256/size → 4) 按 V2 规范校验
+#   5) 提交元数据 → 6) 发布 GitHub Release
 #
-# 新增应用无需改本文件：只要 packages/<appid>/ 与 apps/<appid>.json 存在即自动纳入。
+# 只构建「有改动」的应用：某个应用没动就不会被重新打包、不会平白多出一个版本。
+# 新增应用首次打 tag 会被视为有改动，自动纳入。需要全量重建时用 workflow_dispatch 的 force_all。
 on:
   push:
     tags:
@@ -12,8 +14,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '要发布的 tag（如 v1.0.0），需已存在'
+        description: '要发布的 tag（如 v1.1.0），需已存在'
         required: true
+      force_all:
+        description: '强制构建全部应用（忽略改动检测）'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -23,11 +29,12 @@ env:
   FNPACK_SHA256: "54b97fa7b70968c4d05c79840f5daeff508957d0bb2062fdb0376d00d9615c93"
 
 jobs:
-  # ---------- 第一步：发现所有应用，产出 matrix ----------
+  # ---------- 第一步：发现应用，产出 matrix ----------
   discover:
     runs-on: ubuntu-latest
     outputs:
       apps: ${{ steps.scan.outputs.apps }}
+      has_apps: ${{ steps.scan.outputs.has_apps }}
       version: ${{ steps.ver.outputs.version }}
       tag: ${{ steps.ver.outputs.tag }}
     steps:
@@ -36,7 +43,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve version from tag
+      - name: Resolve tag & version
         id: ver
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -48,16 +55,37 @@ jobs:
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           echo "Release tag: $TAG"
 
-      - name: Discover packaged apps
+      - name: Discover changed apps
         id: scan
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          FORCE: ${{ github.event.inputs.force_all }}
         run: |
           APPS=$(python3 - <<'PY'
-          import json, os, sys
+          import json, os, subprocess, sys
 
-          root = "packages"
-          found = []
-          for appid in sorted(os.listdir(root)):
-              d = os.path.join(root, appid)
+          force = (os.environ.get("FORCE") or "").lower() == "true"
+          tag = os.environ["TAG"]
+
+          # 相对上一个 tag 的改动文件清单；没有上一个 tag 则视为全部改动
+          prev = subprocess.run(
+              ["git", "describe", "--tags", "--abbrev=0", "--exclude", tag, f"{tag}^"],
+              capture_output=True, text=True,
+          ).stdout.strip()
+          if force or not prev:
+              changed = None
+              reason = "强制全量" if force else "无上一个 tag"
+              print(f"::notice::基准 = {reason}，纳入全部应用", file=sys.stderr)
+          else:
+              changed = set(subprocess.run(
+                  ["git", "diff", "--name-only", prev, tag],
+                  capture_output=True, text=True,
+              ).stdout.split())
+              print(f"::notice::基准 tag = {prev}", file=sys.stderr)
+
+          found, skipped = [], []
+          for appid in sorted(os.listdir("packages")):
+              d = os.path.join("packages", appid)
               if not os.path.isdir(d):
                   continue
               if not os.path.exists(os.path.join(d, "manifest")):
@@ -66,20 +94,30 @@ jobs:
               if not os.path.exists(os.path.join("apps", f"{appid}.json")):
                   print(f"::warning::apps/{appid}.json 不存在，跳过", file=sys.stderr)
                   continue
-              found.append(appid)
+              # 改动判定：FPK 工程目录或该应用的镜像源码目录命中即算有改动
+              touched = changed is None or any(
+                  f.startswith(f"packages/{appid}/") or f.startswith(f"src/{appid}/")
+                  for f in changed
+              )
+              (found if touched else skipped).append(appid)
 
-          if not found:
-              sys.exit("packages/ 下没有可发布的合法应用")
-
+          if skipped:
+              print(f"::notice::无改动，跳过：{', '.join(skipped)}", file=sys.stderr)
           print(json.dumps(found))
           PY
           )
           echo "apps=$APPS" >> "$GITHUB_OUTPUT"
-          echo "Discovered apps: $APPS"
+          if [ "$APPS" = "[]" ]; then
+            echo "has_apps=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_apps=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Apps to build: $APPS"
 
   # ---------- 第二步：逐应用构建并回填元数据 ----------
   build:
     needs: discover
+    if: needs.discover.outputs.has_apps == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -121,7 +159,6 @@ jobs:
         run: |
           FPK="packages/${{ matrix.app }}/${{ matrix.app }}.fpk"
           test -f "$FPK" || { echo "::error::未找到 $FPK"; exit 1; }
-          # 单架构：只有一枚 fpk；多架构（<appid>_<arch>.fpk）需在本步骤扩展
           echo "path=$FPK" >> "$GITHUB_OUTPUT"
           echo "sha=$(sha256sum "$FPK" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "size=$(stat -c%s "$FPK")" >> "$GITHUB_OUTPUT"
@@ -137,11 +174,6 @@ jobs:
 
       - name: Verify source against FnDepot V2 spec
         run: python3 scripts/verify_source.py
-
-      - name: Stage metadata changes
-        run: |
-          cp "packages/${{ matrix.app }}/manifest" "/tmp/manifest-${{ matrix.app }}.bak"
-          git diff --stat
 
       - name: Upload FPK artifact
         uses: actions/upload-artifact@v4
@@ -160,6 +192,7 @@ jobs:
   # ---------- 第三步：汇总提交元数据（单点写入，避免多 job 抢推） ----------
   commit-metadata:
     needs: [discover, build]
+    if: needs.discover.outputs.has_apps == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -197,7 +230,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apps packages/*/manifest
+          git add apps packages/*/manifest fnpack.json
           if git diff --cached --quiet; then
             echo "no metadata changes"
           else
@@ -205,9 +238,10 @@ jobs:
             git push origin HEAD:main
           fi
 
-  # ---------- 第四步：发布 Release（汇总所有 fpk） ----------
+  # ---------- 第四步：发布 Release（汇总本次构建的 fpk） ----------
   release:
     needs: [discover, build]
+    if: needs.discover.outputs.has_apps == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download all FPK artifacts
@@ -222,6 +256,8 @@ jobs:
 
       - name: Build release body
         id: body
+        env:
+          APPS: ${{ needs.discover.outputs.apps }}
         run: |
           BODY=$(python3 - <<'PY'
           import json, os
@@ -249,8 +285,6 @@ jobs:
             echo "客户端会做强制校验，请勿手工修改已发布版本的任何字段。"
             echo "RELEASE_BODY_EOF"
           } >> "$GITHUB_OUTPUT"
-        env:
-          APPS: ${{ needs.discover.outputs.apps }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

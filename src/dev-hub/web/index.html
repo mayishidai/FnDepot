@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dev Hub · 应用导航台</title>
+<link rel="icon" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo"></span>
+    <div>
+      <h1>Dev Hub</h1>
+      <p>我自己的应用 · 统一导航与管理</p>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="btn-check-all" class="btn">检查全部更新</button>
+    <button id="btn-events" class="btn ghost">操作记录</button>
+    <button id="btn-settings" class="btn ghost">设置</button>
+    <button id="btn-add" class="btn primary">＋ 添加应用</button>
+  </div>
+</header>
+
+<main>
+  <div id="summary" class="summary"></div>
+  <section id="grid" class="grid"></section>
+  <div id="empty" class="empty" hidden>
+    <h2>还没有添加任何应用</h2>
+    <p>把你自己开发的 GitHub 应用加进来，面板会负责克隆代码、启停服务、检查更新与日志查看。</p>
+    <button class="btn primary" onclick="document.getElementById('btn-add').click()">添加第一个应用</button>
+  </div>
+</main>
+
+<!-- 应用编辑弹窗 -->
+<div id="modal-app" class="modal" hidden>
+  <div class="dialog">
+    <header>
+      <h2 id="modal-app-title">添加应用</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </header>
+    <div class="dialog-body">
+      <div class="field-row">
+        <label class="field">
+          <span>应用 ID <em>唯一标识，用于目录名与访问路径</em></span>
+          <input id="f-id" placeholder="leekfund">
+        </label>
+        <label class="field">
+          <span>显示名称</span>
+          <input id="f-name" placeholder="LeekFund 基金助手">
+        </label>
+      </div>
+      <label class="field">
+        <span>GitHub 仓库地址</span>
+        <input id="f-repo" placeholder="https://github.com/mayishidai/leekfund.git">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>分支</span>
+          <input id="f-branch" placeholder="main">
+        </label>
+        <label class="field">
+          <span>应用端口 <em>容器内监听端口，留空自动分配</em></span>
+          <input id="f-port" type="number" placeholder="自动">
+        </label>
+      </div>
+      <label class="field">
+        <span>启动命令 <em>在工作目录下执行</em></span>
+        <input id="f-run" placeholder="python3 main.py">
+      </label>
+      <label class="field">
+        <span>安装/构建命令 <em>可选，克隆或更新后执行一次</em></span>
+        <input id="f-setup" placeholder="pip install -r requirements.txt">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>子目录 <em>可选，仓库内相对路径</em></span>
+          <input id="f-subdir" placeholder="留空表示仓库根目录">
+        </label>
+        <label class="field">
+          <span>图标地址 <em>可选，留空显示首字母</em></span>
+          <input id="f-icon" placeholder="https://... 或仓库内相对路径">
+        </label>
+      </div>
+      <label class="field">
+        <span>说明</span>
+        <input id="f-desc" placeholder="一句话描述这个应用">
+      </label>
+      <label class="field">
+        <span>环境变量 <em>每行一条 KEY=VALUE</em></span>
+        <textarea id="f-env" rows="3" placeholder="API_KEY=xxx"></textarea>
+      </label>
+      <label class="check">
+        <input id="f-autostart" type="checkbox" checked>
+        <span>面板启动时自动启动该应用</span>
+      </label>
+      <label class="check">
+        <input id="f-clone" type="checkbox" checked>
+        <span>保存后立即克隆仓库</span>
+      </label>
+    </div>
+    <footer>
+      <button class="btn danger" id="btn-delete-app" hidden>删除应用</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" data-close>取消</button>
+      <button class="btn primary" id="btn-save-app">保存</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 日志抽屉 -->
+<div id="drawer-logs" class="drawer" hidden>
+  <header>
+    <h2 id="drawer-logs-title">日志</h2>
+    <div class="actions">
+      <label class="check compact"><input id="logs-follow" type="checkbox" checked><span>自动刷新</span></label>
+      <button class="btn ghost small" id="btn-clear-logs">清空</button>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+  </header>
+  <pre id="logs-content" class="logs">（暂无日志）</pre>
+</div>
+
+<!-- 设置弹窗 -->
+<div id="modal-settings" class="modal" hidden>
+  <div class="dialog narrow">
+    <header>
+      <h2>设置</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </header>
+    <div class="dialog-body">
+      <label class="field">
+        <span>自动检测间隔（分钟）<em>0 表示关闭定时检测</em></span>
+        <input id="s-poll" type="number" min="0" placeholder="30">
+      </label>
+      <label class="field">
+        <span>子应用起始端口</span>
+        <input id="s-port-start" type="number" placeholder="19100">
+      </label>
+      <label class="field">
+        <span>代理超时（秒）</span>
+        <input id="s-timeout" type="number" placeholder="30">
+      </label>
+      <label class="field">
+        <span>GitHub Token <em>可选：访问私有仓库或提高限额</em></span>
+        <input id="s-token" type="password" placeholder="留空则保持不变">
+      </label>
+      <label class="check">
+        <input id="s-clear-token" type="checkbox">
+        <span>清除已保存的 Token</span>
+      </label>
+    </div>
+    <footer>
+      <div class="spacer"></div>
+      <button class="btn ghost" data-close>取消</button>
+      <button class="btn primary" id="btn-save-settings">保存</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 操作记录弹窗 -->
+<div id="modal-events" class="modal" hidden>
+  <div class="dialog">
+    <header>
+      <h2>面板操作记录</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </header>
+    <div class="dialog-body">
+      <pre id="events-content" class="logs tall">（暂无记录）</pre>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

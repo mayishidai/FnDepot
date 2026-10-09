@@ -263,6 +263,14 @@ write_hook config_callback    "after the user changes environment variables in t
 
 chmod +x "$PKG/cmd"/*
 
+# Windows 上 core.fileMode=false，chmod 不会进 git 索引；显式写入 100755，
+# 否则 CI 检出后打出的 FPK 里这些脚本没有可执行位，fnOS 调用会失败。
+if git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  # shellcheck disable=SC2046
+  git -C "$REPO_ROOT" update-index --add --chmod=+x \
+    $(cd "$REPO_ROOT" && ls packages/"$APPID"/cmd/*) 2>/dev/null || true
+fi
+
 # wizard 目录需存在（可为空），用 .gitkeep 让它进版本库
 touch "$PKG/wizard/.gitkeep"
 

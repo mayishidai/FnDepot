@@ -1,0 +1,8 @@
+{
+    "defaults":
+    {
+        "run-as": "package"
+    },
+    "username": "docker-dev-hub",
+    "groupname": "docker-dev-hub"
+}

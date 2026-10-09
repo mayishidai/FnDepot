@@ -3,3 +3,9 @@
 data/
 .DS_Store
 .workbuddy/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/

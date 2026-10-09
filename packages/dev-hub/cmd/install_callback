@@ -1,0 +1,6 @@
+#!/bin/bash
+# 安装完成后执行。数据目录 /var/apps/dev-hub/shares/data 由应用中心按
+# config/resource 的 data-share 声明自动创建，这里只需确认存在。
+DATA_DIR="${TRIM_APPDEST%/app/*}/shares/data"
+[ -d "$DATA_DIR" ] || mkdir -p "$DATA_DIR" 2>/dev/null
+exit 0

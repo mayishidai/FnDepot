@@ -1,0 +1,9 @@
+appname      = dev-hub
+version      = 1.0.0
+display_name = Dev Hub 应用导航台
+desc         = 聚合管理自己开发的 GitHub 应用：代码更新检查、启动停止、统一入口跳转与日志查看。应用在面板容器内以子进程运行，经内置反向代理访问。
+platform     = x86
+source       = thirdparty
+maintainer   = mayishidai
+distributor  = mayishidai
+service_port = 8890

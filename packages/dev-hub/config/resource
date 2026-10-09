@@ -1,0 +1,17 @@
+{
+  "docker-project": {
+    "projects": [
+      {
+        "name": "dev-hub",
+        "path": "docker"
+      }
+    ]
+  },
+  "data-share": {
+    "shares": [
+      {
+        "name": "data"
+      }
+    ]
+  }
+}

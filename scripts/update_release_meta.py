@@ -49,6 +49,33 @@ def app_json_path(appid: str) -> str:
     return os.path.join(ROOT, "apps", f"{appid}.json")
 
 
+def index_path() -> str:
+    return os.path.join(ROOT, "fnpack.json")
+
+
+def ensure_indexed(appid: str, version: str) -> bool:
+    """确保应用已登记在 fnpack.json 索引中；返回是否发生了改动。
+
+    新应用在首次发布前刻意不登记索引（没有 releases 元数据会校验失败），
+    由本步骤在首次发布时自动补上。
+    """
+    path = index_path()
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    apps = data.setdefault("apps", {})
+    if appid in apps:
+        return False
+
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone(timedelta(hours=8))).isoformat(timespec="seconds")
+    apps[appid] = {"details_url": f"apps/{appid}.json", "details_updated_at": now}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    print(f"已在 fnpack.json 登记新应用 {appid}（首个版本 {version}）")
+    return True
+
+
 def resolve_arch(appid: str) -> str:
     """从 manifest 的 platform 推导 packages 的架构键，回退到应用详情。"""
     mp = manifest_path(appid)
@@ -122,6 +149,8 @@ def main():
     with open(app_json, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
+
+    ensure_indexed(appid, args.version)
 
     print(f"仓库           = {REPO}")
     print(f"已更新 {os.path.relpath(app_json, ROOT)} releases[{args.version}].packages.{arch}")

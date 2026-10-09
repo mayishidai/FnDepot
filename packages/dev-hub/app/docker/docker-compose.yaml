@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  dev-hub:
+    image: ghcr.io/mayishidai/dev-hub:latest
+    container_name: dev-hub
+    ports:
+      - "{host_port}:8890"
+    volumes:
+      # 配置、clone 的仓库、日志都在这里，卸载应用不会丢
+      - "/var/apps/dev-hub/shares/data:/data"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
