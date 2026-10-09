@@ -15,6 +15,11 @@
 
 * { box-sizing: border-box; }
 
+/* 兜底：作者样式里的 display 会盖掉浏览器默认的 [hidden]{display:none}，
+   导致弹窗/抽屉用 hidden 属性关不掉、全部叠在一起并吃掉点击。
+   这里显式声明，确保 el.hidden = true/false 始终生效。 */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   background: var(--bg);
