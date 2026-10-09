@@ -34,6 +34,21 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "proxy_timeout": 30,     # 反向代理超时（秒）
 }
 
+# 容器对宿主机发布的「直连端口段」，必须与 packages/dev-hub/app/docker/docker-compose.yaml
+# 里的 ports 映射逐字对应。expose_port=True 的应用在容器内监听这段端口，
+# 只有落在这个区间里，浏览器才能从宿主机直接访问到。
+#
+# 面板只能读到自己的「容器内」端口（8890），读不到应用中心分配的宿主机端口，
+# 所以这里没法自动推导，只能靠这份常量 + compose 双向对齐；不一致时
+# _app_view 会把 expose_port_published 置 False，界面上给出醒目提示。
+EXPOSE_PORT_START = 19100
+EXPOSE_PORT_END = 19119
+
+
+def in_expose_range(port: int) -> bool:
+    return EXPOSE_PORT_START <= int(port or 0) <= EXPOSE_PORT_END
+
+
 _lock = threading.RLock()
 
 
@@ -76,9 +91,30 @@ def load_config() -> dict:
         cfg["apps"] = apps if isinstance(apps, list) else []
         removed = cfg.get("removed")
         cfg["removed"] = [str(x) for x in removed] if isinstance(removed, list) else []
-        if _seed_builtins(cfg):
+        # 先补全老条目的新字段，再播种缺失的内置应用（播种依赖归一化后的清单）。
+        # 注意两个都要跑，别用 `a() or b()` 短路——迁移为真时 b 就再也不会执行了。
+        migrated = _normalize_existing(cfg)
+        seeded = _seed_builtins(cfg)
+        if migrated or seeded:
             save_config(cfg)
         return cfg
+
+
+def _normalize_existing(cfg: dict) -> bool:
+    """把 config.json 里的既有条目过一遍 normalize_app，返回是否发生改动。
+
+    升级迁移用：老版本写下的条目不含 expose_port 等后加的键，直接按新 schema
+    读取会 KeyError。这里只补字段、不动端口（reassign_port=False），
+    保证「用户改过的配置不被覆盖」这条约定依然成立。
+    """
+    apps: list[dict] = cfg["apps"]
+    changed = False
+    for idx, raw in enumerate(list(apps)):
+        fixed = normalize_app(dict(raw), cfg["settings"], apps)
+        if fixed != raw:
+            apps[idx] = fixed
+            changed = True
+    return changed
 
 
 def _seed_builtins(cfg: dict) -> bool:
@@ -150,11 +186,17 @@ def normalize_app(raw: dict, settings: dict, apps: list[dict],
         "desc": str(raw.get("desc", "")).strip(),
         "auto_start": bool(raw.get("auto_start", True)),
         "enabled": bool(raw.get("enabled", True)),
+        # 独立端口直连：应用自己占一个对外端口，卡片「打开」直接跳过去，
+        # 不走 /p/<id>/ 路径前缀反代。有些应用的仪表盘把资源与 API 地址写死成
+        # 根路径（例如 Octop 前端用的是 window.location.host + /api/...），
+        # 挂在路径前缀下必然 404，只能让它独占一个端口。
+        "expose_port": bool(raw.get("expose_port", False)),
         "env": {str(k): str(v) for k, v in (raw.get("env") or {}).items()},
     }
     used = {a["port"] for a in apps if a.get("id") != app["id"]}
     if not app["port"] or (reassign_port and app["port"] in used):
-        app["port"] = next_free_port(settings, exclude=app["id"], apps=apps)
+        within = (EXPOSE_PORT_START, EXPOSE_PORT_END) if app["expose_port"] else None
+        app["port"] = next_free_port(settings, exclude=app["id"], apps=apps, within=within)
     return app
 
 
@@ -179,10 +221,23 @@ def validate_app(app: dict, cfg: dict, allow_id: str | None = None) -> str | Non
 
 
 def next_free_port(settings: dict, exclude: str | None = None,
-                   apps: list[dict] | None = None) -> int:
+                   apps: list[dict] | None = None,
+                   within: tuple[int, int] | None = None) -> int:
+    """挑一个空闲端口号。
+
+    within=(lo, hi) 时只在区间内挑 —— expose_port 应用必须落在容器已发布的端口段
+    里，否则直连地址从宿主机根本连不上。区间被占满时退化为从 port_start 起找：
+    宁可给出一个区间外的端口（界面上会挂醒目提示），也不要抛异常让播种整个失败。
+    """
     if apps is None:
         apps = load_config().get("apps", [])
     used = {a["port"] for a in apps if a.get("id") != exclude}
+    if within:
+        port = within[0]
+        while port <= within[1] and port in used:
+            port += 1
+        if port <= within[1]:
+            return port
     port = int(settings.get("port_start", 19100))
     while port in used:
         port += 1

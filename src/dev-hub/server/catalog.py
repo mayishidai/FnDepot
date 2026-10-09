@@ -9,9 +9,12 @@
 
 注意：这些子应用都在面板容器内以子进程运行，因此
 - 端口必须是容器内空闲端口（面板从 settings.port_start 起分配，默认 19100）；
-- 浏览器只通过面板反代 /p/<id>/ 访问，子应用无需对外暴露端口；
+- 默认浏览器经面板反代 /p/<id>/ 访问，子应用无需对外暴露端口；
 - 反向代理只映射「一个」端口，所以需要多进程的应用要拆成多张卡片
-  （典型的 mini_games：H5 静态预览与后端 API 就是两张卡）。
+  （典型的 mini_games：H5 静态预览与后端 API 就是两张卡）；
+- 少数应用的仪表盘把资源/API/WebSocket 地址写死成「根路径」，挂在路径前缀下必然
+  404，这类应用要置 expose_port=True 让它独占一个对外端口（见 compose 里发布的
+  端口段），卡片上的「打开」会直接跳到 http://<面板主机>:<port>/。
 """
 from __future__ import annotations
 
@@ -94,5 +97,46 @@ BUILTIN_APPS: list[dict] = [
         "auto_start": False,
         "enabled": False,            # 空仓库，先禁用，避免自启时报错刷日志
         "env": {},
+    },
+    {
+        "id": "octop",
+        "name": "Octop",
+        "repo": "https://github.com/TencentCloud/Octop.git",
+        "branch": "main",
+        "port": 19106,
+        # 独立端口直连：它的仪表盘把资源与 API 地址写死成根路径
+        # （window.location.host + /api/...，前端源码 dashboard/src/api/config.ts
+        #  里的 BASE_URL 只覆盖了一部分，聊天/终端/远程桌面的 WebSocket 仍走根路径），
+        # 挂在 /p/octop/ 下面必然全部 404，只能让它独占一个对外端口。
+        "expose_port": True,
+        "desc": "腾讯开源的多用户多智能体 AI 助手（Web 控制台 / CLI / IM / 定时任务）。"
+                "仪表盘写死根路径，故以独立端口直连：点「打开」跳 NAS:19106。"
+                "首次启动要现场构建前端并装 243 个 Python 锁包，耗时约十几分钟。",
+        "setup": (
+            "set -e\n"
+            "# 前端：仓库刻意不提交构建产物（src/octop/dashboard/** 在 .gitignore 里），\n"
+            "# 必须现场 npm ci + vite build；产物直接落到 src/octop/dashboard，不影响 git 状态。\n"
+            "npm --prefix dashboard ci\n"
+            "NODE_ENV=production npm --prefix dashboard run build\n"
+            "# Python：按仓库 uv.lock 锁定安装（uv 本身只装一次）\n"
+            "test -x .uv/bin/uv || { python3 -m venv .uv && .uv/bin/pip install -q -U pip uv; }\n"
+            ".uv/bin/uv sync --frozen --no-dev\n"
+            "# 首次初始化管理员；已有库则跳过，保证 setup 可重复执行（更新代码后会重跑）\n"
+            "if [ ! -f \"$OCTOP_HOME/octop.db\" ]; then\n"
+            "  PW=\"Oc1$(od -An -N8 -tx1 /dev/urandom | tr -d ' \\n')\"\n"
+            "  .venv/bin/octop init --yes --admin-username admin --admin-password \"$PW\"\n"
+            "  printf '\\n============================================\\n"
+            " Octop 初始账号：admin / %s\\n"
+            " （登录后请尽快改密码，退出后再也看不到）\\n"
+            "============================================\\n\\n' \"$PW\"\n"
+            "fi"
+        ),
+        # 直连访问时来源在容器外，必须监听 0.0.0.0（不能像 AIVideoStudio 那样只绑 loopback）。
+        "run": ".venv/bin/octop run --host 0.0.0.0 --port {port}",
+        "auto_start": True,
+        "enabled": True,
+        # 数据落在面板的数据卷里：OCTOP_HOME 是 Octop 唯一认的安装根（~/.octop 的替代）。
+        # 放在 /data 下而不是应用目录里，既随卷持久化，又不会把 git 工作区弄脏。
+        "env": {"OCTOP_HOME": "/data/octop-home/.octop"},
     },
 ]

@@ -5,7 +5,15 @@ services:
     image: ghcr.io/mayishidai/dev-hub:latest
     container_name: dev-hub
     ports:
+      # 面板自身：由应用中心分配宿主机端口（{host_port} 是 fnOS 注入的占位符）
       - "{host_port}:8890"
+      # 独立端口直连段：标记了 expose_port 的子应用在容器内监听这段端口，
+      # 必须逐端口映射到宿主机，浏览器才能直连（它们写死了根路径，走不了 /p/<id>/ 反代）。
+      # 这段范围要与面板的分配区间对齐：面板从 settings.port_start（默认 19100）起分配，
+      # 且把 expose_port 应用限制在 store.EXPOSE_PORT_START..END 内，两边必须逐字一致。
+      # 注意：若上面 {host_port} 恰好被分配到本段内，会与本行冲突导致容器起不来，
+      # 请在应用设置页把面板端口改到本段之外。
+      - "19100-19119:19100-19119"
     volumes:
       # 配置、clone 的仓库、日志都在这里，卸载应用不会丢
       - "/var/apps/dev-hub/shares/data:/data"

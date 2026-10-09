@@ -1,7 +1,9 @@
 """Dev Hub —— 飞牛 fnOS 应用导航与管理面板。
 
 聚合管理自己开发的 GitHub 应用：代码更新、启动停止、日志查看、统一入口跳转。
-所有子应用在面板容器内以子进程运行，经由内置反向代理 /p/<appid>/ 访问。
+所有子应用在面板容器内以子进程运行，经由内置反向代理 /p/<appid>/ 访问；
+个别把资源/接口地址写死在根路径、无法挂路径前缀的应用（条目标记 expose_port），
+改用容器已发布的独立端口直连，卡片「打开」直接跳 http://<面板主机>:<port>/。
 """
 from __future__ import annotations
 
@@ -115,13 +117,40 @@ async def _scheduler() -> None:
 
 # ------------------------------------------------------------------ 组装视图
 
-async def _app_view(item: dict, cfg: dict) -> dict:
+def _panel_origin(request: Request | None) -> str:
+    """面板自身对外可访问的 origin（不含端口），用于拼「独立端口直连」的跳转地址。
+
+    取请求的 Host 头去掉端口，协议优先信 X-Forwarded-Proto（前面挂了反代/隧道时
+    request.url.scheme 会是 http，拼出来的链接就不是用户实际访问的协议了）。
+    """
+    if request is None:
+        return ""
+    host = request.headers.get("host", "").strip()
+    if not host:
+        return ""
+    if host.startswith("["):                 # IPv6 字面量：[::1]:8890
+        hostname = host.split("]", 1)[0].lstrip("[")
+    elif ":" in host:
+        hostname = host.rsplit(":", 1)[0]
+    else:
+        hostname = host
+    if not hostname:
+        return ""
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip()
+    return f"{proto}://{hostname}"
+
+
+async def _app_view(item: dict, cfg: dict, request: Request | None = None) -> dict:
     app_id = item["id"]
     runtime = procs.status(app_id)
     git = _git_cache.get(app_id, {}).get("data")
     if git is None:
         git = await asyncio.to_thread(gitops.status, item)
         _git_cache[app_id] = {"checked_at": time.time(), "data": git}
+    origin = _panel_origin(request)
+    external_url = ""
+    if item.get("expose_port") and origin:
+        external_url = f"{origin}:{item['port']}/"
     return {
         **item,
         "runtime": runtime,
@@ -130,6 +159,10 @@ async def _app_view(item: dict, cfg: dict) -> dict:
         "setup_state": procs.setup_state(app_id),
         "needs_setup": procs.needs_setup(item),
         "url": f"/p/{app_id}/",
+        "external_url": external_url,
+        # 直连端口是否落在 compose 已发布的端口段内。False 时界面要给出醒目提示，
+        # 否则用户点「打开」只会看到连接被拒绝，完全看不出是端口没发布出去。
+        "expose_port_published": (not item.get("expose_port")) or store.in_expose_range(item["port"]),
     }
 
 
@@ -155,19 +188,19 @@ async def health() -> dict:
 # ------------------------------------------------------------------ 应用 CRUD
 
 @app.get("/api/apps")
-async def list_apps() -> list[dict]:
+async def list_apps(request: Request) -> list[dict]:
     cfg = store.load_config()
-    return [await _app_view(i, cfg) for i in cfg["apps"]]
+    return [await _app_view(i, cfg, request) for i in cfg["apps"]]
 
 
 @app.get("/api/apps/{app_id}")
-async def get_app(app_id: str) -> dict:
+async def get_app(app_id: str, request: Request) -> dict:
     cfg = store.load_config()
-    return await _app_view(_require_app(cfg, app_id), cfg)
+    return await _app_view(_require_app(cfg, app_id), cfg, request)
 
 
 @app.post("/api/apps")
-async def create_app(payload: dict = Body(...)) -> dict:
+async def create_app(request: Request, payload: dict = Body(...)) -> dict:
     cfg = store.load_config()
     item = store.normalize_app(payload, cfg["settings"], cfg["apps"])
     if (err := store.validate_app(item, cfg)):
@@ -177,11 +210,11 @@ async def create_app(payload: dict = Body(...)) -> dict:
     store.append_event(f"{item['id']}: 新增应用")
     if payload.get("clone_now", True):
         await asyncio.to_thread(gitops.clone, item, cfg["settings"]["github_token"])
-    return await _app_view(item, cfg)
+    return await _app_view(item, cfg, request)
 
 
 @app.put("/api/apps/{app_id}")
-async def update_app(app_id: str, payload: dict = Body(...)) -> dict:
+async def update_app(app_id: str, request: Request, payload: dict = Body(...)) -> dict:
     cfg = store.load_config()
     old = _require_app(cfg, app_id)
     merged = {**old, **{k: v for k, v in payload.items() if k != "id"}}
@@ -193,7 +226,7 @@ async def update_app(app_id: str, payload: dict = Body(...)) -> dict:
     cfg["apps"][cfg["apps"].index(old)] = item
     store.save_config(cfg)
     store.append_event(f"{app_id}: 配置已更新")
-    return await _app_view(item, cfg)
+    return await _app_view(item, cfg, request)
 
 
 @app.delete("/api/apps/{app_id}")
@@ -428,6 +461,17 @@ async def _do_proxy(request: Request, app_id: str, rest: str) -> Response:
         return Response(
             content=proxy._error_page(f"/p/{app_id}", item["port"], "应用处于「待启用」状态"),
             status_code=503, media_type="text/html; charset=utf-8",
+        )
+    if item.get("expose_port"):
+        # 这类应用彻底不走面板反代：它的仪表盘把资源/接口地址写死成根路径，
+        # 挂 /p/<id>/ 必然 404。所以这里与运行态无关，一律只给一张引导页；
+        # 未运行时额外提示一句，免得用户以为「点开没反应」。
+        origin = _panel_origin(request)
+        target = f"{origin}:{item['port']}/" if origin else f"<面板地址>:{item['port']}/"
+        return Response(
+            content=proxy._direct_page(app_id, item["port"], target,
+                                       running=procs.is_running(app_id)),
+            status_code=200, media_type="text/html; charset=utf-8",
         )
     if not procs.is_running(app_id):
         return Response(

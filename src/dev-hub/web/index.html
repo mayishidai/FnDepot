@@ -94,6 +94,11 @@
         <textarea id="f-env" rows="3" placeholder="API_KEY=xxx"></textarea>
       </label>
       <label class="check">
+        <input id="f-expose" type="checkbox">
+        <span>独立端口直连（该应用把资源/接口地址写死在根路径，挂 <code>/p/&lt;id&gt;/</code> 会 404；
+          勾选后卡片「打开」直跳 <code>http://面板主机:端口/</code>，需该端口已在 compose 中发布）</span>
+      </label>
+      <label class="check">
         <input id="f-enabled" type="checkbox" checked>
         <span>启用该应用（取消勾选则置灰为「待启用」，不参与自启与更新检测）</span>
       </label>

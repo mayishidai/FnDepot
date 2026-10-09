@@ -80,6 +80,40 @@ async def forward(request: Request, prefix: str, rest_path: str, port: int, time
     )
 
 
+def _direct_page(app_id: str, port: int, target: str, running: bool = True) -> str:
+    """「独立端口直连」应用的提示页。
+
+    这类应用的仪表盘把资源与 API 地址写死成根路径（典型是 Octop 前端用的
+    window.location.host + /api/...），挂在 /p/<id>/ 前缀下必然 404，
+    所以不走代理，改为提示用户打开它独占的那个端口。
+
+    running=False 时补一句未运行提示：否则用户打开这个地址会直接连接被拒，
+    误以为端口没发布。
+    """
+    warn = "" if running else (
+        '<p style="color:#e3b341">该应用当前<strong>未运行</strong>，'
+        '请先在面板卡片上点「启动」，否则打开下面的地址会连接失败。</p>'
+    )
+    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>请使用独立端口访问</title>
+<style>
+body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:#0f1216;color:#e6edf3;font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}}
+.box{{max-width:560px;padding:32px 36px;background:#161b22;border:1px solid #262d36;border-radius:14px}}
+h1{{font-size:17px;margin:0 0 12px}}code{{color:#7ee787}}
+p{{color:#9aa7b4;margin:8px 0}}a{{color:#58a6ff}}
+.go{{display:inline-block;margin-top:14px;padding:8px 16px;border-radius:8px;
+background:#2f81f7;color:#fff;text-decoration:none;font-size:14px}}
+</style></head><body><div class="box">
+<h1>该应用需要独立端口访问</h1>
+<p><code>{app_id}</code> 的控制台把资源与接口地址写死在根路径上，无法挂在
+<code>/p/{app_id}/</code> 这样的路径前缀下（会全部 404）。</p>
+<p>面板已在容器内把它映射到独立端口 <code>{port}</code>，请直接打开：</p>
+{warn}<p><a class="go" href="{target}">{target}</a></p>
+<p style="font-size:12px;color:#6e7b8b">面板卡片上的「打开」按钮也会跳到这个地址。</p>
+</div></body></html>"""
+
+
 def _error_page(prefix: str, port: int, detail: str) -> str:
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>无法访问子应用</title>

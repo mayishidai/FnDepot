@@ -100,12 +100,28 @@ function cardHTML(app) {
     badges.push(`<span class="badge">${esc(git.branch || app.branch)}</span>`);
   }
 
+  // 独立端口直连的应用：跳转地址是 http://<面板主机>:<port>/，不走 /p/<id>/
+  if (app.expose_port) {
+    if (app.expose_port_published === false) {
+      badges.push(`<span class="badge failed">直连端口未发布</span>`);
+    } else {
+      badges.push(`<span class="badge setup">独立端口直连</span>`);
+    }
+  }
+
   const avatar = app.icon
     ? `<img class="avatar" src="${esc(app.icon)}" alt="" onerror="this.outerHTML='<div class=\\'avatar\\'>${esc((app.name || "?").slice(0, 1).toUpperCase())}</div>'">`
     : `<div class="avatar">${esc((app.name || "?").slice(0, 1).toUpperCase())}</div>`;
 
   const setupBtn = !disabled && hasSetup && setup !== "running"
     ? `<button class="btn small" data-act="setup" data-id="${app.id}">${setup === "idle" ? "安装依赖" : "重装依赖"}</button>`
+    : "";
+
+  // expose_port 的应用必须直连，/p/<id>/ 只会返回一张「请走独立端口」的引导页，
+  // 所以有 external_url 时优先用它；拿不到 origin（比如命令行直连）就退回引导页。
+  const openHref = app.expose_port && app.external_url ? app.external_url : app.url;
+  const openTitle = app.expose_port && app.external_url
+    ? `独立端口直连：${app.external_url}${app.expose_port_published === false ? "（该端口未在 compose 中发布，可能连不上）" : ""}`
     : "";
 
   return `
@@ -138,7 +154,7 @@ function cardHTML(app) {
       <button class="btn small" data-act="logs" data-id="${app.id}">日志</button>
       ${disabled
         ? `<span class="btn small is-off" title="应用未启用">打开</span>`
-        : `<a class="btn small" href="${esc(app.url)}" target="_blank" rel="noopener">打开</a>`}
+        : `<a class="btn small" href="${esc(openHref)}" target="_blank" rel="noopener" ${openTitle ? `title="${esc(openTitle)}"` : ""}>打开</a>`}
       <button class="btn small ghost" data-act="edit" data-id="${app.id}">编辑</button>
     </div>
   </article>`;
@@ -218,6 +234,7 @@ function openAppModal(app) {
   $("#f-desc").value = app ? app.desc : "";
   $("#f-env").value = app ? Object.entries(app.env || {}).map(([k, v]) => `${k}=${v}`).join("\n") : "";
   $("#f-enabled").checked = app ? app.enabled !== false : true;
+  $("#f-expose").checked = app ? !!app.expose_port : false;
   $("#f-autostart").checked = app ? !!app.auto_start : true;
   $("#f-clone").checked = !app;
   $("#modal-app").hidden = false;
@@ -247,6 +264,7 @@ $("#btn-save-app").addEventListener("click", async () => {
     desc: $("#f-desc").value.trim(),
     env: parseEnv($("#f-env").value),
     enabled: $("#f-enabled").checked,
+    expose_port: $("#f-expose").checked,
     auto_start: $("#f-autostart").checked,
     clone_now: $("#f-clone").checked,
   };
