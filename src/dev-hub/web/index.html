@@ -72,7 +72,7 @@
         <input id="f-run" placeholder="python3 main.py">
       </label>
       <label class="field">
-        <span>安装/构建命令 <em>可选，克隆或更新后执行一次</em></span>
+        <span>安装/构建命令 <em>可选。首次启动时自动执行，更新代码后也会重跑</em></span>
         <input id="f-setup" placeholder="pip install -r requirements.txt">
       </label>
       <div class="field-row">
@@ -92,6 +92,10 @@
       <label class="field">
         <span>环境变量 <em>每行一条 KEY=VALUE</em></span>
         <textarea id="f-env" rows="3" placeholder="API_KEY=xxx"></textarea>
+      </label>
+      <label class="check">
+        <input id="f-enabled" type="checkbox" checked>
+        <span>启用该应用（取消勾选则置灰为「待启用」，不参与自启与更新检测）</span>
       </label>
       <label class="check">
         <input id="f-autostart" type="checkbox" checked>

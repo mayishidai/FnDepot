@@ -82,6 +82,8 @@ button { font: inherit; cursor: pointer; }
 .btn.danger { background: transparent; border-color: #5b2b2b; color: var(--danger); }
 .btn.danger:hover { background: #2a1414; }
 .btn.small { padding: 4px 9px; font-size: 12px; }
+/* 用 span 顶替 <a> 呈现「打开」时，要复刻禁用态观感 */
+.btn.is-off { opacity: .45; cursor: not-allowed; }
 
 .icon-btn {
   border: none; background: transparent; color: var(--muted);
@@ -127,6 +129,9 @@ main { padding: 22px 24px 60px; max-width: 1400px; margin: 0 auto; }
 }
 .card:hover { border-color: #333d4b; }
 .card.has-update { border-color: #6b5a1f; }
+/* 「待启用」的卡片整体降级，一眼能和正常运行的应用区分开 */
+.card.is-disabled { opacity: .62; border-style: dashed; }
+.card.is-disabled:hover { border-color: var(--line); }
 
 .card-head { display: flex; align-items: flex-start; gap: 12px; }
 
@@ -155,6 +160,8 @@ main { padding: 22px 24px 60px; max-width: 1400px; margin: 0 auto; }
 .state.running { color: #7ee787; }
 .state.exited .dot { background: var(--danger); }
 .state.exited { color: #ff9b95; }
+.state.off .dot { background: transparent; border: 1px solid var(--muted); }
+.state.off { color: var(--muted); }
 
 .badges { display: flex; gap: 6px; flex-wrap: wrap; min-height: 20px; }
 .badge {
@@ -165,6 +172,9 @@ main { padding: 22px 24px 60px; max-width: 1400px; margin: 0 auto; }
 .badge.new { color: #7ee787; border-color: #2b5a33; background: #102417; }
 .badge.dirty { color: #ff9b95; border-color: #5b2b2b; background: #2a1414; }
 .badge.muted { opacity: .8; }
+.badge.setup { color: #79c0ff; border-color: #21456b; background: #0d1d2e; }
+.badge.failed { color: #ff9b95; border-color: #5b2b2b; background: #2a1414; }
+.badge .spin { margin-right: 2px; }
 
 .meta {
   font-size: 12px; color: var(--muted);

@@ -72,7 +72,23 @@ function cardHTML(app) {
   const st = app.runtime.status;
   const git = app.git || {};
   const behind = git.behind || 0;
+  const disabled = app.enabled === false;
+  const setup = app.setup_state || "idle";
+  const hasSetup = !!(app.setup || "").trim();
+  const running = st === "running";
   const badges = [];
+
+  // 启用/依赖状态优先展示，其余的是 git 状态。
+  // 禁用态不放徽章：右上角状态胶囊已经写了「待启用」，重复一遍是噪音。
+  if (!disabled) {
+    if (setup === "running") {
+      badges.push(`<span class="badge setup"><span class="spin">◌</span> 安装依赖中</span>`);
+    } else if (setup === "failed") {
+      badges.push(`<span class="badge failed">依赖安装失败</span>`);
+    } else if (hasSetup && setup !== "ok") {
+      badges.push(`<span class="badge muted">依赖未安装</span>`);
+    }
+  }
 
   if (!git.cloned) badges.push(`<span class="badge muted">未克隆</span>`);
   else {
@@ -88,17 +104,19 @@ function cardHTML(app) {
     ? `<img class="avatar" src="${esc(app.icon)}" alt="" onerror="this.outerHTML='<div class=\\'avatar\\'>${esc((app.name || "?").slice(0, 1).toUpperCase())}</div>'">`
     : `<div class="avatar">${esc((app.name || "?").slice(0, 1).toUpperCase())}</div>`;
 
-  const running = st === "running";
+  const setupBtn = !disabled && hasSetup && setup !== "running"
+    ? `<button class="btn small" data-act="setup" data-id="${app.id}">${setup === "idle" ? "安装依赖" : "重装依赖"}</button>`
+    : "";
 
   return `
-  <article class="card ${behind > 0 ? "has-update" : ""}">
+  <article class="card ${behind > 0 ? "has-update" : ""} ${disabled ? "is-disabled" : ""}">
     <div class="card-head">
       ${avatar}
       <div class="card-title">
         <h3 title="${esc(app.name)}">${esc(app.name)}</h3>
         <p>${esc(app.desc || app.repo)}</p>
       </div>
-      <span class="state ${st}"><i class="dot"></i>${STATE_TEXT[st] || st}</span>
+      <span class="state ${disabled ? "off" : st}"><i class="dot"></i>${disabled ? "待启用" : (STATE_TEXT[st] || st)}</span>
     </div>
 
     <div class="badges">${badges.join("")}</div>
@@ -113,11 +131,14 @@ function cardHTML(app) {
       ${running
         ? `<button class="btn small" data-act="stop" data-id="${app.id}">停止</button>
            <button class="btn small" data-act="restart" data-id="${app.id}">重启</button>`
-        : `<button class="btn small primary" data-act="start" data-id="${app.id}">启动</button>`}
-      <button class="btn small" data-act="update" data-id="${app.id}" ${behind > 0 ? "" : "disabled"}>更新代码</button>
-      <button class="btn small" data-act="check" data-id="${app.id}">检查</button>
+        : `<button class="btn small primary" data-act="start" data-id="${app.id}" ${disabled ? "disabled" : ""}>启动</button>`}
+      ${setupBtn}
+      <button class="btn small" data-act="update" data-id="${app.id}" ${behind > 0 && !disabled ? "" : "disabled"}>更新代码</button>
+      <button class="btn small" data-act="check" data-id="${app.id}" ${disabled ? "disabled" : ""}>检查</button>
       <button class="btn small" data-act="logs" data-id="${app.id}">日志</button>
-      <a class="btn small" href="${esc(app.url)}" target="_blank" rel="noopener">打开</a>
+      ${disabled
+        ? `<span class="btn small is-off" title="应用未启用">打开</span>`
+        : `<a class="btn small" href="${esc(app.url)}" target="_blank" rel="noopener">打开</a>`}
       <button class="btn small ghost" data-act="edit" data-id="${app.id}">编辑</button>
     </div>
   </article>`;
@@ -135,13 +156,13 @@ $("#grid").addEventListener("click", async (ev) => {
   if (act === "edit") return openAppModal(app);
   if (act === "logs") return openLogs(app);
 
-  const labels = { start: "启动", stop: "停止", restart: "重启", update: "更新代码", check: "检查更新" };
+  const labels = { start: "启动", stop: "停止", restart: "重启", update: "更新代码", check: "检查更新", setup: "安装依赖" };
   btn.disabled = true;
   const origin = btn.textContent;
   btn.innerHTML = `<span class="spin">◌</span>`;
   try {
     let result;
-    if (act === "start" || act === "stop" || act === "restart") {
+    if (act === "start" || act === "stop" || act === "restart" || act === "setup") {
       result = await api(`/api/apps/${id}/${act}`, { method: "POST" });
     } else if (act === "update") {
       result = await api(`/api/apps/${id}/update`, { method: "POST" });
@@ -196,6 +217,7 @@ function openAppModal(app) {
   $("#f-icon").value = app ? app.icon : "";
   $("#f-desc").value = app ? app.desc : "";
   $("#f-env").value = app ? Object.entries(app.env || {}).map(([k, v]) => `${k}=${v}`).join("\n") : "";
+  $("#f-enabled").checked = app ? app.enabled !== false : true;
   $("#f-autostart").checked = app ? !!app.auto_start : true;
   $("#f-clone").checked = !app;
   $("#modal-app").hidden = false;
@@ -224,6 +246,7 @@ $("#btn-save-app").addEventListener("click", async () => {
     icon: $("#f-icon").value.trim(),
     desc: $("#f-desc").value.trim(),
     env: parseEnv($("#f-env").value),
+    enabled: $("#f-enabled").checked,
     auto_start: $("#f-autostart").checked,
     clone_now: $("#f-clone").checked,
   };

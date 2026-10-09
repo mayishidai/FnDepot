@@ -23,6 +23,10 @@ _started_at: dict[str, float] = {}
 _exit_code: dict[str, int | None] = {}
 _stopped_by_user: set[str] = set()      # 区分「主动停止」与「异常退出」
 
+# 依赖安装状态：idle（从没装过）/ running / ok / failed
+# 结果落到 state.json，面板重启后不会重复安装。
+_setup_state: dict[str, str] = {}
+
 
 # ------------------------------------------------------------------ 日志
 
@@ -65,6 +69,49 @@ def clear_log(app_id: str) -> None:
     with _proc_lock:
         if path.is_file():
             path.write_text("", encoding="utf-8")
+
+
+# ------------------------------------------------------------------ 依赖安装态
+
+def setup_state(app_id: str) -> str:
+    """返回该应用的依赖安装状态。首次访问时从 state.json 恢复。"""
+    with _proc_lock:
+        cached = _setup_state.get(app_id)
+    if cached is not None:
+        return cached
+    entry = (store.load_state().get("apps") or {}).get(app_id) or {}
+    saved = entry.get("setup_state")
+    if saved == "ok":
+        state = "ok"
+    elif saved == "failed":
+        state = "failed"      # 保留上次的失败结论，界面才会提示「依赖安装失败」
+    else:
+        # 面板在安装中途重启会留下悬挂的 running，按「待重装」处理
+        state = "ok" if entry.get("setup_ok") else "idle"
+    with _proc_lock:
+        return _setup_state.setdefault(app_id, state)
+
+
+def _set_setup_state(app_id: str, state: str) -> None:
+    with _proc_lock:
+        _setup_state[app_id] = state
+    st = store.load_state()
+    entry = st.setdefault("apps", {}).setdefault(app_id, {})
+    entry["setup_ok"] = state == "ok"
+    entry["setup_state"] = state
+    entry["setup_at"] = time.time()
+    store.save_state(st)
+
+
+def needs_setup(app: dict) -> bool:
+    """配置了安装命令、且还没有成功执行过。"""
+    if not (app.get("setup") or "").strip():
+        return False
+    return setup_state(app["id"]) != "ok"
+
+
+def setup_running(app_id: str) -> bool:
+    return setup_state(app_id) == "running"
 
 
 # ------------------------------------------------------------------ 运行态
@@ -116,32 +163,56 @@ def _child_env(app: dict) -> dict:
 
 
 def run_setup(app: dict) -> tuple[bool, str]:
-    """执行应用的依赖安装/构建命令，输出写入日志。"""
+    """执行应用的依赖安装/构建命令，输出写入日志，并记录安装状态。"""
+    app_id = app["id"]
     cmd = (app.get("setup") or "").strip()
     if not cmd:
         return True, "无需执行"
     cmd = _render_cmd(app, cmd)
     cwd = store.work_dir(app)
     if not cwd.is_dir():
-        return False, f"工作目录不存在：{cwd}"
-    log_line(app["id"], f"开始执行 setup：{cmd}")
+        # 强调失败：否则界面上会一直停在「未安装依赖」，看不出是被什么卡住的
+        _set_setup_state(app_id, "failed")
+        msg = f"工作目录不存在：{cwd}（先克隆代码）"
+        log_line(app_id, f"setup 无法执行：{msg}")
+        return False, msg
+    _set_setup_state(app_id, "running")
+    log_line(app_id, f"开始执行 setup：{cmd}")
     try:
         proc = subprocess.run(
             cmd, shell=True, cwd=str(cwd), env=_child_env(app),
-            capture_output=True, text=True, timeout=1800,
+            capture_output=True, text=True, timeout=3600,
         )
     except subprocess.TimeoutExpired:
-        log_line(app["id"], "setup 超时（>30min）")
+        _set_setup_state(app_id, "failed")
+        log_line(app_id, "setup 超时（>60min）")
         return False, "setup 超时"
     out = ((proc.stdout or "") + (proc.stderr or "")).strip()
     if out:
         for line in out.splitlines()[-200:]:
-            log_line(app["id"], line)
+            log_line(app_id, line)
     if proc.returncode != 0:
-        log_line(app["id"], f"setup 失败（退出码 {proc.returncode}）")
+        _set_setup_state(app_id, "failed")
+        log_line(app_id, f"setup 失败（退出码 {proc.returncode}）")
         return False, f"setup 失败（退出码 {proc.returncode}）"
-    log_line(app["id"], "setup 完成")
+    _set_setup_state(app_id, "ok")
+    log_line(app_id, "setup 完成")
+    store.append_event(f"{app_id}: 依赖安装完成")
     return True, "setup 完成"
+
+
+def ensure_cloned(app: dict) -> tuple[bool, str]:
+    """确保代码已在本地；没克隆过就先克隆。启动与安装依赖前都要先过这一步。"""
+    app_id = app["id"]
+    if store.app_dir(app_id).is_dir():
+        return True, ""
+    log_line(app_id, "应用目录不存在，先执行克隆")
+    from . import gitops
+    ok, msg = gitops.clone(app)
+    if not ok:
+        log_line(app_id, f"克隆失败：{msg}")
+        return False, f"克隆失败：{msg}"
+    return True, ""
 
 
 def start(app: dict, run_setup_first: bool = False) -> tuple[bool, str]:
@@ -150,13 +221,9 @@ def start(app: dict, run_setup_first: bool = False) -> tuple[bool, str]:
     if is_running(app_id):
         return True, "已在运行"
 
-    if not store.app_dir(app_id).is_dir():
-        log_line(app_id, "应用目录不存在，先执行克隆")
-        from . import gitops
-        ok, msg = gitops.clone(app)
-        if not ok:
-            log_line(app_id, f"克隆失败：{msg}")
-            return False, f"克隆失败：{msg}"
+    ok, msg = ensure_cloned(app)
+    if not ok:
+        return False, msg
 
     if run_setup_first:
         ok, msg = run_setup(app)

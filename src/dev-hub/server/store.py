@@ -2,7 +2,7 @@
 
 数据目录结构（容器内 /data，由 $TRIM_PKGVAR 挂载）：
     /data/config.json        面板设置 + 应用清单（唯一事实来源）
-    /data/state.json         运行态快照（重启后用于恢复卡片状态）
+    /data/state.json         运行态快照（重启后用于恢复卡片状态、依赖是否装过）
     /data/apps/<id>/         各应用 clone 的代码
     /data/logs/<id>.log      各应用运行日志
     /data/logs/events.log    面板自身的操作记录
@@ -16,6 +16,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from . import catalog
 
 DATA_DIR = Path(os.environ.get("DEVHUB_DATA", "/data"))
 APPS_DIR = DATA_DIR / "apps"
@@ -72,7 +74,34 @@ def load_config() -> dict:
         apps = cfg.get("apps")
         cfg["settings"] = settings
         cfg["apps"] = apps if isinstance(apps, list) else []
+        removed = cfg.get("removed")
+        cfg["removed"] = [str(x) for x in removed] if isinstance(removed, list) else []
+        if _seed_builtins(cfg):
+            save_config(cfg)
         return cfg
+
+
+def _seed_builtins(cfg: dict) -> bool:
+    """把 catalog 里尚未登记的预置应用补进配置；返回是否发生改动。
+
+    只做「补缺」：已存在的 id 一律不动（用户改过的字段不能被覆盖），
+    被用户在面板里删掉的 id 记在 cfg["removed"]，也不再补回。
+    """
+    apps: list[dict] = cfg["apps"]
+    existing = {a.get("id") for a in apps}
+    removed = set(cfg.get("removed") or [])
+    changed = False
+    for raw in catalog.BUILTIN_APPS:
+        if raw["id"] in existing or raw["id"] in removed:
+            continue
+        apps.append(normalize_app(dict(raw), cfg["settings"], apps, reassign_port=True))
+        existing.add(raw["id"])
+        changed = True
+    return changed
+
+
+def is_builtin(app_id: str) -> bool:
+    return any(item["id"] == app_id for item in catalog.BUILTIN_APPS)
 
 
 def save_config(cfg: dict) -> None:
@@ -97,8 +126,17 @@ def save_state(st: dict) -> None:
 
 # ------------------------------------------------------------------ 应用条目
 
-def normalize_app(raw: dict, settings: dict) -> dict:
-    """把前端提交的原始对象规范化成配置条目（补默认值、去多余键）。"""
+def normalize_app(raw: dict, settings: dict, apps: list[dict],
+                  reassign_port: bool = False) -> dict:
+    """把前端提交的原始对象规范化成配置条目（补默认值、去多余键）。
+
+    apps 必须显式传入当前应用清单：本函数可能在端口缺省时分配端口，
+    而它同时被 load_config 的播种流程调用，不能反过来再去 load_config（会递归）。
+
+    reassign_port 只给内置应用播种用：预置端口可能被用户自己的应用先占了，
+    这时要自动改到空闲端口。用户在界面上手填的端口一律不改，
+    撞了就让 validate_app 报「端口已被 xxx 占用」——静默改端口比报错更难排查。
+    """
     app = {
         "id": str(raw.get("id", "")).strip(),
         "name": str(raw.get("name", "")).strip(),
@@ -111,10 +149,12 @@ def normalize_app(raw: dict, settings: dict) -> dict:
         "icon": str(raw.get("icon", "")).strip(),
         "desc": str(raw.get("desc", "")).strip(),
         "auto_start": bool(raw.get("auto_start", True)),
+        "enabled": bool(raw.get("enabled", True)),
         "env": {str(k): str(v) for k, v in (raw.get("env") or {}).items()},
     }
-    if not app["port"]:
-        app["port"] = next_free_port(settings, exclude=app["id"])
+    used = {a["port"] for a in apps if a.get("id") != app["id"]}
+    if not app["port"] or (reassign_port and app["port"] in used):
+        app["port"] = next_free_port(settings, exclude=app["id"], apps=apps)
     return app
 
 
@@ -138,9 +178,11 @@ def validate_app(app: dict, cfg: dict, allow_id: str | None = None) -> str | Non
     return None
 
 
-def next_free_port(settings: dict, exclude: str | None = None) -> int:
-    cfg = load_config()
-    used = {a["port"] for a in cfg.get("apps", []) if a["id"] != exclude}
+def next_free_port(settings: dict, exclude: str | None = None,
+                   apps: list[dict] | None = None) -> int:
+    if apps is None:
+        apps = load_config().get("apps", [])
+    used = {a["port"] for a in apps if a.get("id") != exclude}
     port = int(settings.get("port_start", 19100))
     while port in used:
         port += 1

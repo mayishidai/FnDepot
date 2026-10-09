@@ -1,18 +1,34 @@
 # Dev Hub —— 飞牛 fnOS 应用导航与管理面板
 #
 # 面板负责：clone/拉取各应用代码、以子进程方式启停、采集日志、反代跳转。
-# 因此镜像内需自带 git 与常见运行时（python3/node），供被管理的子应用使用。
+# 镜像内还要自带各子应用需要的运行时（子应用是直接跑在本容器里的进程）：
+#   python3.12 —— FastAPI 类子应用；各自在应用目录里建独立 venv（见应用配置的 setup 命令），
+#                 避免 AIVideoStudio 锁的 fastapi==0.128.2 和面板自己的 0.115.6 打架。
+#   node 22    —— mini_games 后端用了 node:sqlite + --experimental-sqlite，要求 Node >= 22.5；
+#                 Debian bookworm 自带的 nodejs 是 18，跑不起来，必须单独装。
+#   esbuild    —— mini_games 的 H5 打包脚本（tools/build-sheep.mjs）通过 PATH 调用它。
+#   ffmpeg     —— AIVideoStudio 的本地成片合成（ffmpeg / ffprobe）。
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    DEVHUB_DATA=/data
+    DEVHUB_DATA=/data \
+    DEBIAN_FRONTEND=noninteractive
 
-# git：代码更新；node/npm：JS 类子应用；curl：健康检查与子应用依赖
+# git：代码更新；ffmpeg：媒体合成；curl/gnupg/xz-utils：装 Node 源与健康检查
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        git ca-certificates curl nodejs npm \
+        git ca-certificates curl gnupg xz-utils ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node 22 + 全局 esbuild（版本号打印出来，构建日志里能直接确认装对了）
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
+    && npm install -g esbuild \
+    && node -v \
+    && esbuild --version \
+    && ffmpeg -version | head -1 \
     && git config --system --add safe.directory '*'
 
 WORKDIR /opt/dev-hub

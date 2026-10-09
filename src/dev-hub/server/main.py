@@ -23,6 +23,15 @@ app = FastAPI(title="Dev Hub", docs_url="/api/docs", openapi_url="/api/openapi.j
 # 内存中的 git 状态缓存：app_id -> {checked_at, data}
 _git_cache: dict[str, dict] = {}
 
+# 后台任务引用池。asyncio 只持有弱引用，不显式保存的话任务可能被 GC 掉。
+_bg_tasks: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> None:
+    task = asyncio.create_task(coro)
+    _bg_tasks.add(task)
+    task.add_done_callback(_bg_tasks.discard)
+
 
 # ------------------------------------------------------------------ 启动/关闭
 
@@ -32,21 +41,60 @@ async def _startup() -> None:
     await asyncio.to_thread(gitops.init_safe_directory)
     store.append_event("面板启动")
     cfg = store.load_config()
+
+    # 没装过依赖的应用先排队后台安装（串行），装完再拉起；
+    # 已经装好的直接同步启动，避免面板可用性被一个慢应用拖住。
+    pending_setup: list[dict] = []
     for item in cfg.get("apps", []):
-        if item.get("auto_start"):
-            ok, msg = await asyncio.to_thread(procs.start, item)
-            if not ok:
-                store.append_event(f"{item['id']}: 自启失败 - {msg}")
+        if not item.get("enabled", True) or not item.get("auto_start"):
+            continue
+        if procs.needs_setup(item):
+            pending_setup.append(item)
+            continue
+        ok, msg = await asyncio.to_thread(procs.start, item)
+        if not ok:
+            store.append_event(f"{item['id']}: 自启失败 - {msg}")
+
+    if pending_setup:
+        app.state.boot_setup = asyncio.create_task(_bootstrap_setup(pending_setup))
     app.state.scheduler = asyncio.create_task(_scheduler())
+
+
+async def _setup_then_start(item: dict) -> tuple[bool, str]:
+    """先克隆 → 装依赖 → 拉起进程。任一步失败都不启动，免得刷一屏 ModuleNotFoundError。"""
+    app_id = item["id"]
+    ok, msg = await asyncio.to_thread(procs.ensure_cloned, item)
+    if not ok:
+        store.append_event(f"{app_id}: 克隆失败 - {msg}")
+        return False, msg
+    ok, msg = await asyncio.to_thread(procs.run_setup, item)
+    if not ok:
+        store.append_event(f"{app_id}: 依赖安装失败 - {msg}")
+        return False, msg
+    r_ok, r_msg = await asyncio.to_thread(procs.start, item)
+    store.append_event(
+        f"{app_id}: 依赖安装完成并已启动" if r_ok
+        else f"{app_id}: 依赖安装完成但启动失败 - {r_msg}"
+    )
+    return r_ok, r_msg
+
+
+async def _bootstrap_setup(items: list[dict]) -> None:
+    for item in items:
+        try:
+            await _setup_then_start(item)
+        except Exception as exc:  # noqa: BLE001 - 后台任务不允许因单个应用异常中断
+            store.append_event(f"{item['id']}: 启动期安装异常 - {exc}")
 
 
 @app.on_event("shutdown")
 async def _shutdown() -> None:
-    task = getattr(app.state, "scheduler", None)
-    if task:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+    for attr in ("scheduler", "boot_setup"):
+        task = getattr(app.state, attr, None)
+        if task:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
     await asyncio.to_thread(procs.stop_all)
     store.append_event("面板关闭，已停止全部子应用")
 
@@ -79,6 +127,8 @@ async def _app_view(item: dict, cfg: dict) -> dict:
         "runtime": runtime,
         "git": git,
         "git_checked_at": _git_cache.get(app_id, {}).get("checked_at"),
+        "setup_state": procs.setup_state(app_id),
+        "needs_setup": procs.needs_setup(item),
         "url": f"/p/{app_id}/",
     }
 
@@ -119,7 +169,7 @@ async def get_app(app_id: str) -> dict:
 @app.post("/api/apps")
 async def create_app(payload: dict = Body(...)) -> dict:
     cfg = store.load_config()
-    item = store.normalize_app(payload, cfg["settings"])
+    item = store.normalize_app(payload, cfg["settings"], cfg["apps"])
     if (err := store.validate_app(item, cfg)):
         raise HTTPException(400, err)
     cfg["apps"].append(item)
@@ -136,7 +186,8 @@ async def update_app(app_id: str, payload: dict = Body(...)) -> dict:
     old = _require_app(cfg, app_id)
     merged = {**old, **{k: v for k, v in payload.items() if k != "id"}}
     merged["id"] = app_id
-    item = store.normalize_app(merged, cfg["settings"])
+    others = [a for a in cfg["apps"] if a["id"] != app_id]
+    item = store.normalize_app(merged, cfg["settings"], others)
     if (err := store.validate_app(item, cfg, allow_id=app_id)):
         raise HTTPException(400, err)
     cfg["apps"][cfg["apps"].index(old)] = item
@@ -151,6 +202,9 @@ async def delete_app(app_id: str, purge: bool = False) -> dict:
     item = _require_app(cfg, app_id)
     await asyncio.to_thread(procs.stop, app_id)
     cfg["apps"].remove(item)
+    # 内置应用被显式删除后要留个记号，否则下次加载配置会被「补缺」逻辑又塞回来
+    if store.is_builtin(app_id) and app_id not in cfg["removed"]:
+        cfg["removed"].append(app_id)
     store.save_config(cfg)
     _git_cache.pop(app_id, None)
 
@@ -169,14 +223,45 @@ async def delete_app(app_id: str, purge: bool = False) -> dict:
 
 # ------------------------------------------------------------------ 运行控制
 
+DISABLED_HINT = "该应用处于「待启用」状态，请先在编辑弹窗里勾选「启用」"
+
+
 @app.post("/api/apps/{app_id}/start")
 async def start_app(app_id: str, setup: bool = False) -> dict:
     cfg = store.load_config()
     item = _require_app(cfg, app_id)
-    ok, msg = await asyncio.to_thread(procs.start, item, setup)
+    if not item.get("enabled", True):
+        raise HTTPException(400, DISABLED_HINT)
+
+    # 依赖没装过（或明确要求重装）：转后台执行「装依赖 → 启动」，
+    # 不让 HTTP 请求挂在 pip 上（akshare/pandas 首次安装要几分钟）。
+    if setup or procs.needs_setup(item):
+        if procs.setup_running(app_id):
+            return {"ok": True, "message": "依赖正在安装中…", "runtime": procs.status(app_id)}
+        _spawn(_setup_then_start(item))
+        return {
+            "ok": True,
+            "message": "正在后台安装依赖，完成后会自动启动（进度见日志）",
+            "runtime": procs.status(app_id),
+        }
+
+    ok, msg = await asyncio.to_thread(procs.start, item)
     if not ok:
         raise HTTPException(400, msg)
     return {"ok": True, "message": msg, "runtime": procs.status(app_id)}
+
+
+@app.post("/api/apps/{app_id}/setup")
+async def setup_app(app_id: str) -> dict:
+    """只装依赖，不启动。用于用户手动重装（例如换 Python 版本或依赖装坏了）。"""
+    cfg = store.load_config()
+    item = _require_app(cfg, app_id)
+    if not (item.get("setup") or "").strip():
+        raise HTTPException(400, "该应用没有配置安装命令")
+    if procs.setup_running(app_id):
+        return {"ok": True, "message": "依赖正在安装中…", "setup_state": "running"}
+    _spawn(asyncio.to_thread(procs.run_setup, item))
+    return {"ok": True, "message": "已开始安装依赖（进度见日志）", "setup_state": "running"}
 
 
 @app.post("/api/apps/{app_id}/stop")
@@ -193,7 +278,13 @@ async def stop_app(app_id: str) -> dict:
 async def restart_app(app_id: str, setup: bool = False) -> dict:
     cfg = store.load_config()
     item = _require_app(cfg, app_id)
-    ok, msg = await asyncio.to_thread(procs.restart, item, setup)
+    if not item.get("enabled", True):
+        raise HTTPException(400, DISABLED_HINT)
+    await asyncio.to_thread(procs.stop, app_id)
+    if setup or procs.needs_setup(item):
+        _spawn(_setup_then_start(item))
+        return {"ok": True, "message": "正在后台安装依赖，完成后会自动启动", "runtime": procs.status(app_id)}
+    ok, msg = await asyncio.to_thread(procs.start, item)
     if not ok:
         raise HTTPException(400, msg)
     return {"ok": True, "message": msg, "runtime": procs.status(app_id)}
@@ -232,6 +323,8 @@ async def check_all() -> dict:
 
 async def _check_all(cfg: dict) -> None:
     for item in cfg["apps"]:
+        if not item.get("enabled", True):
+            continue          # 「待启用」的应用不 clone、不 fetch，免得白白拉几 G 代码
         try:
             await _refresh_git(item, cfg, do_fetch=True)
         except Exception as exc:  # noqa: BLE001
@@ -240,7 +333,7 @@ async def _check_all(cfg: dict) -> None:
 
 @app.post("/api/apps/{app_id}/update")
 async def update_code(app_id: str, setup: bool = False, restart: bool = True) -> dict:
-    """拉取代码 →（可选）执行 setup →（可选）重启。"""
+    """拉取代码 →（仓库配了安装命令就）重装依赖 →（可选）重启。"""
     cfg = store.load_config()
     item = _require_app(cfg, app_id)
     token = cfg["settings"]["github_token"]
@@ -251,7 +344,8 @@ async def update_code(app_id: str, setup: bool = False, restart: bool = True) ->
         raise HTTPException(400, f"更新失败：{msg}")
 
     steps = [msg]
-    if setup:
+    # 更新可能改了依赖清单，只要配了 setup 就重跑一遍（幂等，已装好时几秒即可）
+    if setup or (item.get("setup") or "").strip():
         s_ok, s_msg = await asyncio.to_thread(procs.run_setup, item)
         steps.append(s_msg)
         if not s_ok:
@@ -330,6 +424,11 @@ async def _do_proxy(request: Request, app_id: str, rest: str) -> Response:
     item = store.find_app(cfg, app_id)
     if item is None:
         return JSONResponse({"detail": f"应用 {app_id} 不存在"}, status_code=404)
+    if not item.get("enabled", True):
+        return Response(
+            content=proxy._error_page(f"/p/{app_id}", item["port"], "应用处于「待启用」状态"),
+            status_code=503, media_type="text/html; charset=utf-8",
+        )
     if not procs.is_running(app_id):
         return Response(
             content=proxy._error_page(f"/p/{app_id}", item["port"], "应用当前未运行"),
