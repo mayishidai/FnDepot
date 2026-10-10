@@ -27,6 +27,12 @@ shell 变量取名成 port/dir/python/null/venv/data，那会被误替换。
 
 多行命令的退出码只反映最后一行（POSIX sh 与 cmd.exe 都是如此），
 所以多行 setup 会被 _prepare_setup 改造成「任一行失败即整体失败」。
+
+setup 的输出是**边产生边追加到应用日志**的（不是等命令跑完一次性写）。
+面板前端的日志抽屉开着「跟随」时每 3 秒拉一次 tail，于是安装过程在界面上是
+实时的。这不是锦上添花：akshare/pandas/opencv 这类首次安装会被网络读取拖到
+十几分钟，旧实现（subprocess.run + capture_output=True）在这期间日志一片空白、
+界面看着像死了，完全无法判断是慢还是挂。见 run_setup。
 """
 from __future__ import annotations
 
@@ -38,11 +44,23 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import Iterator
 
 from . import store
 
 MAX_LOG_BYTES = 5 * 1024 * 1024      # 单个日志文件上限，超出后轮转一次
 TAIL_DEFAULT = 300
+
+# setup（依赖安装/构建）的策略。
+# - 超时必须有上限：安装是后台跑的、不占 HTTP 请求，所以可以给得宽松；但真挂住时
+#   没有上限就意味着界面永远停在「安装中」。30 分钟对 pip/npm 首次安装绰绰有余
+#   （实测最慢的一次约 14 分钟，还是网络读取抖动导致的）。
+# - 心跳：静默超过 SETUP_HEARTBEAT 就补一行「仍在运行」。这正是旧实现最难受的
+#   地方 —— 明明进程活着，日志却几分钟不新增，看起来和死了没区别。
+SETUP_TIMEOUT = 1800                 # 秒
+SETUP_HEARTBEAT = 30                 # 秒
+MAX_SETUP_OUTPUT = 1024 * 1024       # 单次 setup 落盘的应用输出上限（字节）
+_SETUP_TAIL_KEEP = 64 * 1024         # 单行超长（无换行）时的兜底切分阈值
 
 IS_WINDOWS = os.name == "nt"
 
@@ -290,8 +308,80 @@ def _prepare_setup(cmd: str) -> tuple[str, str | None]:
     return " && ".join(lines), None
 
 
+def _iter_output(stream) -> "Iterator[bytes]":
+    """把子进程输出流切成「完整的一行」逐个产出。
+
+    两个不能偷懒的地方：
+    1. 不能写成 `for line in stream`（按 \\n 切）。pip / curl 的进度条只写 \\r 不写
+       \\n，按 \\n 切会把整段进度攒在缓冲区里，直到进程结束才一次性吐出来 ——
+       正好违背「边跑边看」的初衷。所以这里按 \\r 与 \\n 一起切。
+    2. 不能读一块就直接 decode。UTF-8 的多字节序列会被块边界劈成半个字符，硬解
+       就是乱码（而 _decode 的 GBK 兜底会把它解得面目全非）。这里只解码「夹在两个
+       分隔符之间」的片段 —— \\r / \\n 是 ASCII，绝不可能出现在多字节序列内部，
+       所以每个完整片段一定是完整字符序列；尾部残留留到下一块再拼。
+
+    另外 `read(8192)` 在管道上会阻塞到读满 8192 字节才返回，必须用 read1（读到
+    多少返回多少），否则小批量的输出一样会被卡在缓冲里。
+    """
+    read = getattr(stream, "read1", None) or stream.read
+    pending = b""
+    while True:
+        chunk = read(8192)
+        if not chunk:
+            break
+        pending += chunk
+        # \r\n 当一次分隔（否则每行都会多出一个空片段）
+        parts = re.split(rb"\r\n|\r|\n", pending)
+        pending = parts.pop()          # 最后一段可能不完整，留着
+        yield from parts
+        # 超长行（一直没有分隔符）兜底，不让缓冲无限膨胀
+        while len(pending) >= _SETUP_TAIL_KEEP:
+            yield pending[:_SETUP_TAIL_KEEP]
+            pending = pending[_SETUP_TAIL_KEEP:]
+    if pending:
+        yield pending
+
+
+def _stream_setup_output(stream, state: dict, emit) -> None:
+    """后台线程体：把 setup 的输出边产生边交给 emit 落盘。
+
+    `emit(text)` 由调用方提供（见 run_setup 里的 `emit`）：写入的格式与文件句柄
+    都收在那里一处，这个线程只负责「切片、解码、限流」。
+
+    每条输出都带时间戳与 `[setup]` 标记（由 emit 加），和面板自己写的 `[dev-hub]`
+    行区分开 —— 出问题时一眼能看出哪句是 pip 说的、哪句是面板说的。时间戳还能直接
+    看出「卡在哪一行之后」，这正是排查安装挂起时最需要的信息。
+
+    超过 MAX_SETUP_OUTPUT 后**继续读、但不再写** —— 不是偷懒：管道写满时子进程会
+    阻塞在 write 上永远不退出，停止读取就等于把安装挂死。
+    """
+    written = 0
+    for raw in _iter_output(stream):
+        text = _decode(raw).strip()
+        if not text:
+            continue                    # 空行只会稀释日志，丢掉
+        state["last"] = time.monotonic()
+        if written >= MAX_SETUP_OUTPUT:
+            if not state["truncated"]:
+                state["truncated"] = True
+                emit(f"输出已超过 {MAX_SETUP_OUTPUT // 1024}KB，后续只排空不再记录"
+                     f"（进程仍在继续运行）")
+            continue
+        written += emit(text)
+        state["lines"] += 1
+
+
 def run_setup(app: dict) -> tuple[bool, str]:
-    """执行应用的依赖安装/构建命令，输出写入日志，并记录安装状态。"""
+    """执行应用的依赖安装/构建命令，输出**边产生边**写入日志，并记录安装状态。
+
+    刻意不用 subprocess.run(capture_output=True)：那是等命令整条跑完才把输出一次性
+    写进日志，安装期间界面一片空白，无法区分「慢」与「挂」（实测踩过一次 14 分钟
+    无输出的网络读取挂起）。改成 Popen + 后台读取线程后就能实时看到进度。
+
+    进程用 start_new_session=True 起在独立进程组里 —— 这不只是为了整洁：
+    _terminate 超时时按进程组整组杀（os.killpg），不独立成组的话会连面板自己
+    一起杀掉。代价是面板被 SIGTERM 时安装进程不会跟着收到信号，会继续跑完。
+    """
     app_id = app["id"]
     cmd = (app.get("setup") or "").strip()
     if not cmd:
@@ -309,29 +399,113 @@ def run_setup(app: dict) -> tuple[bool, str]:
         msg = f"工作目录不存在：{cwd}（先克隆代码）"
         log_line(app_id, f"setup 无法执行：{msg}")
         return False, msg
+
     _set_setup_state(app_id, "running")
-    log_line(app_id, f"开始执行 setup：{cmd}")
+
+    store.ensure_dirs()
+    path = store.log_file(app_id)
+    with _proc_lock:
+        _rotate_if_needed(path)
+    fh = path.open("a", encoding="utf-8")
+    reader: threading.Thread | None = None
+
+    def note(message: str) -> None:
+        """面板侧日志写入（开始 / 心跳 / 收尾结论）。
+
+        刻意不用 log_line：它会先调 _rotate_if_needed，一旦轮转就把文件改名搬走，
+        而 fh 还指着被改名的那份。两处后果都不轻 ——「开始执行 setup」留在旧文件而
+        安装输出写进新文件，用户从 tail 里只看得到一半；更糟的是收尾那条 log_line
+        会在刚写完输出之后立刻轮转，把整段安装日志搬进 .log.1，打开日志反而空白。
+        所以整个 run_setup 只在开始前轮转一次，之后一律走同一个句柄。
+        """
+        with _proc_lock:
+            fh.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [dev-hub] {message}\n")
+            fh.flush()
+
+    def emit(text: str) -> int:
+        """写一条子进程输出，返回写入字节数（供 MAX_SETUP_OUTPUT 限流用）。"""
+        line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [setup] {text}\n"
+        with _proc_lock:
+            fh.write(line)
+            fh.flush()
+        return len(line.encode("utf-8"))
+
     try:
-        proc = subprocess.run(
-            cmd, shell=True, cwd=str(cwd), env=_child_env(app),
-            capture_output=True, timeout=3600,
+        note(f"开始执行 setup：{cmd}")
+        try:
+            proc = subprocess.Popen(
+                cmd, shell=True, cwd=str(cwd), env=_child_env(app),
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            _set_setup_state(app_id, "failed")
+            note(f"setup 无法启动：{exc}")
+            return False, f"setup 无法启动：{exc}"
+
+        state = {"lines": 0, "last": time.monotonic(), "truncated": False}
+        reader = threading.Thread(
+            target=_stream_setup_output, args=(proc.stdout, state, emit),
+            name=f"setup-log-{app_id}", daemon=True,
         )
-    except subprocess.TimeoutExpired:
-        _set_setup_state(app_id, "failed")
-        log_line(app_id, "setup 超时（>60min）")
-        return False, "setup 超时"
-    out = (_decode(proc.stdout) + _decode(proc.stderr)).strip()
-    if out:
-        for line in out.splitlines()[-200:]:
-            log_line(app_id, line)
-    if proc.returncode != 0:
-        _set_setup_state(app_id, "failed")
-        log_line(app_id, f"setup 失败（退出码 {proc.returncode}）")
-        return False, f"setup 失败（退出码 {proc.returncode}）"
-    _set_setup_state(app_id, "ok")
-    log_line(app_id, "setup 完成")
-    store.append_event(f"{app_id}: 依赖安装完成")
-    return True, "setup 完成"
+        reader.start()
+
+        started = time.monotonic()
+        timed_out = False
+        # 用「带超时的 wait」当心跳计时器：进程一退出就立刻返回，不会白等一个心跳周期。
+        # 等待时长按「当前静默了多久」动态算（quiet 越接近阈值等得越短），这样心跳的
+        # 粒度是秒级；如果固定等一个整周期，最坏要静默 2×阈值 才报得出来（实测就是
+        # 这么表现的：阈值 2 秒时第一条心跳写的是「已 4 秒」）。
+        # stdout 是 PIPE 而这里调 wait()，不会像 subprocess 文档警告的那样死锁 ——
+        # 管道有 reader 线程在持续排空。
+        while True:
+            step = SETUP_HEARTBEAT - (time.monotonic() - state["last"])
+            try:
+                proc.wait(timeout=max(1.0, step))
+                break
+            except subprocess.TimeoutExpired:
+                pass
+            elapsed = time.monotonic() - started
+            if elapsed >= SETUP_TIMEOUT:
+                timed_out = True
+                _terminate(proc, force=True)   # 整组杀，否则孙子进程会占着端口不放
+                try:
+                    proc.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    pass
+                break
+            if time.monotonic() - state["last"] >= SETUP_HEARTBEAT:
+                state["last"] = time.monotonic()
+                note(f"setup 仍在运行（已 {int(elapsed)} 秒，暂无新输出）")
+
+        reader.join(timeout=10)
+        if reader.is_alive():
+            # 极端情况：孙进程还占着管道不让它 EOF，读取线程卡在 read 上。
+            note("setup 输出读取未正常结束（有子进程仍占着输出管道），已放弃等待")
+        elapsed = time.monotonic() - started
+
+        if timed_out:
+            _set_setup_state(app_id, "failed")
+            limit = (f"{SETUP_TIMEOUT // 60} 分钟" if SETUP_TIMEOUT >= 60
+                     else f"{SETUP_TIMEOUT} 秒")
+            msg = f"setup 超时（>{limit}）"
+            note(msg)
+            return False, msg
+        if proc.returncode != 0:
+            _set_setup_state(app_id, "failed")
+            msg = f"setup 失败（退出码 {proc.returncode}）"
+            note(msg)
+            return False, msg
+        _set_setup_state(app_id, "ok")
+        note(f"setup 完成（耗时 {int(elapsed)} 秒，{state['lines']} 行输出）")
+        store.append_event(f"{app_id}: 依赖安装完成")
+        return True, "setup 完成"
+    finally:
+        # 读取线程还活着时不能关 fh：它会撞上「往已关闭的文件写」抛异常、把栈打乱
+        # 日志。留给 GC —— 线程结束后最后一个引用消失，句柄自然释放。
+        if reader is None or not reader.is_alive():
+            with _proc_lock:
+                fh.close()
 
 
 def ensure_cloned(app: dict) -> tuple[bool, str]:
