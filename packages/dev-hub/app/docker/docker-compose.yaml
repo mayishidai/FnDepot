@@ -20,4 +20,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=Asia/Shanghai
+      # 飞牛以 run-as: package 的非 root uid 启动，容器里没有 HOME：npm/uv/pip/git
+      # 都定位不到家目录（npm 会以 uv_os_homedir ENOENT 直接崩，`npm ci` 都进不去）。
+      # 镜像里已经钉了一份，这里再显式写一遍，便于在应用设置页直接看到/覆盖。
+      - HOME=/data
     restart: unless-stopped

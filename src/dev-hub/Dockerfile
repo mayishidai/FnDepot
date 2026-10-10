@@ -13,9 +13,15 @@
 #   ffmpeg     —— AIVideoStudio 的本地成片合成（ffmpeg / ffprobe）。
 FROM python:3.12-slim
 
+# HOME 必须显式给：官方 python 镜像不设 HOME，而飞牛以 `run-as: package` 的
+# 非 root uid 启动容器，该 uid 在镜像 /etc/passwd 里没有条目 —— npm / uv / pip / git
+# 全都定位不到家目录（npm 会以 uv_os_homedir ENOENT 直接崩）。/data 是随卷持久化的
+# 可写目录，缓存留在这里还能让 uv 对 .venv 走硬链接（跨文件系统会退化成拷贝或报错）。
+# 官方 Octop 的 fnOS 包同样钉了 HOME=/data。
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DEVHUB_DATA=/data \
+    HOME=/data \
     DEBIAN_FRONTEND=noninteractive
 
 # git：代码更新；ffmpeg：媒体合成；curl/gnupg/xz-utils：装 Node 源与健康检查

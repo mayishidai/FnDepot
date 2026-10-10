@@ -273,6 +273,17 @@ def _child_env(app: dict) -> dict:
     env["HOST"] = "0.0.0.0"
     env["DEVHUB_APP_ID"] = app["id"]
     env["DEVHUB_APP_DIR"] = str(store.app_dir(app["id"]))
+    if not IS_WINDOWS and not env.get("HOME"):
+        # 容器里没有 HOME。镜像基于 python:3.12-slim，飞牛以 `run-as: package` 的
+        # 非 root uid 启动容器，而这个 uid 在镜像的 /etc/passwd 里根本没有条目，
+        # 于是所有靠「家目录」定位缓存/配置的工具都会哑掉：npm 直接以
+        # uv_os_homedir ENOENT 崩掉（连 `npm ci` 都进不去），uv 则拿不到缓存目录。
+        # npm / uv / pip / git 都要它，所以在这里统一兜底，而不是逐个应用去补。
+        # 官方 Octop 的 fnOS 包在 Dockerfile 的 ENV 与 compose 的 environment 里
+        # 各写了一遍 HOME=/data，就是为这件事。
+        # 指到数据卷还有个附带好处：uv 的缓存与 .venv 落在同一文件系统上，
+        # 默认的硬链接模式才走得通（缓存放容器可写层、venv 放挂载卷会跨文件系统）。
+        env["HOME"] = str(store.DATA_DIR)
     # 自定义环境变量同样展开占位符：把 `API_PORT={port}` 写进 env，比在命令前拼
     # `API_PORT=19104 node ...` 可靠得多 —— 那是 POSIX 专有语法，cmd.exe 不认
     # （实测报「'API_PORT' 不是内部或外部命令」）。
