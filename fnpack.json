@@ -10,6 +10,10 @@
     "agnes-ai-studio": {
       "details_url": "apps/agnes-ai-studio.json",
       "details_updated_at": "2026-09-20T16:30:00+08:00"
+    },
+    "dev-hub": {
+      "details_url": "apps/dev-hub.json",
+      "details_updated_at": "2026-10-09T20:10:00+08:00"
     }
   }
 }

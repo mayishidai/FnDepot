@@ -17,9 +17,21 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 
 REPO_FALLBACK = "mayishidai/FnDepot"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+TZ_CN = timezone(timedelta(hours=8))
+
+
+def now_iso() -> str:
+    """带 +08:00 偏移的 ISO 8601。
+
+    `updated_at` / `details_updated_at` 按规范都要带时区；补空串会让
+    verify_source 告警，客户端也没法按发布时间排序。
+    """
+    return datetime.now(TZ_CN).isoformat(timespec="seconds")
 
 
 def resolve_repo() -> str:
@@ -66,9 +78,7 @@ def ensure_indexed(appid: str, version: str) -> bool:
     if appid in apps:
         return False
 
-    from datetime import datetime, timezone, timedelta
-    now = datetime.now(timezone(timedelta(hours=8))).isoformat(timespec="seconds")
-    apps[appid] = {"details_url": f"apps/{appid}.json", "details_updated_at": now}
+    apps[appid] = {"details_url": f"apps/{appid}.json", "details_updated_at": now_iso()}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
@@ -132,7 +142,9 @@ def main():
     version_block = releases.setdefault(args.version, {})
     if not version_block.get("changelog"):
         version_block["changelog"] = args.changelog or f"发布 {args.version}。"
-    version_block.setdefault("updated_at", "")
+    # 只在缺失/为空时补：已发布版本的时间戳要保持稳定，重复回填不应改动它。
+    if not version_block.get("updated_at"):
+        version_block["updated_at"] = now_iso()
     packages = version_block.setdefault("packages", {})
 
     # 若历史版本用了其他架构键，保持单键一致，避免同版本出现多个分支

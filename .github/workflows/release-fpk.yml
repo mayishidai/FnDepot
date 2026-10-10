@@ -188,6 +188,7 @@ jobs:
           path: |
             apps/${{ matrix.app }}.json
             packages/${{ matrix.app }}/manifest
+            fnpack.json
 
   # ---------- 第三步：汇总提交元数据（单点写入，避免多 job 抢推） ----------
   commit-metadata:
@@ -222,6 +223,31 @@ jobs:
             cp "$f" "$dest"
             echo "applied $dest"
           done
+
+      # 每个 matrix job 各自从干净检出出发，生成的 fnpack.json 都只含「自己那一个」新条目，
+      # 直接 cp 会互相覆盖（后写的那份把先前的条目抹掉），所以这里改成按 id 合并。
+      # 之前正是漏了这一步，导致新应用首次发布时 ensure_indexed() 的索引改动被静默丢弃。
+      - name: Merge new index entries
+        run: |
+          python3 - <<'PY'
+          import glob, json, pathlib
+          path = pathlib.Path("fnpack.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          apps = data.setdefault("apps", {})
+          added = []
+          for staged in sorted(glob.glob("staged/**/fnpack.json", recursive=True)):
+              incoming = json.loads(pathlib.Path(staged).read_text(encoding="utf-8"))
+              for appid, entry in (incoming.get("apps") or {}).items():
+                  if appid not in apps:
+                      apps[appid] = entry
+                      added.append(appid)
+          if added:
+              path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                              encoding="utf-8")
+              print("已登记索引：" + ", ".join(added))
+          else:
+              print("索引无新增条目")
+          PY
 
       - name: Verify source against FnDepot V2 spec
         run: python3 scripts/verify_source.py
