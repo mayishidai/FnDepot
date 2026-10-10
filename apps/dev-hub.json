@@ -15,5 +15,17 @@
   "install_type": "",
   "is_docker": true,
   "service_port": "8890",
-  "releases": {}
+  "releases": {
+    "1.1.0": {
+      "changelog": "发布 1.1.0。",
+      "updated_at": "",
+      "packages": {
+        "x86": {
+          "download_url": "https://github.com/mayishidai/FnDepot/releases/download/v1.1.0/dev-hub.fpk",
+          "sha256": "ae4472cd6c67d657f71ed4a762987fdd98cb781bec1d9871d078b40c90a5b82b",
+          "size": 8445
+        }
+      }
+    }
+  }
 }
