@@ -100,17 +100,45 @@ def load_config() -> dict:
         return cfg
 
 
+def _backfill_placeholder(raw: dict, entry: dict) -> dict:
+    """把「还没配置过」的内置占位条目按清单补齐。
+
+    判据是 `run` 与 `setup` **同时为空**：只有「代码还没推上来、先占个位」的
+    卡片才会这样（catalog 里就是拿空命令当占位）。用户只要能写出任意一条命令，
+    这条路径就再也不会碰它 —— 所以不存在覆盖用户配置的风险。
+
+    典型场景：AIImageStudio 空仓库期间占位、代码推上来后要让老配置也能开箱即用。
+    端口不在这里补（占位期间可能已被重排过），交给 normalizer 保留原值。
+    """
+    if raw.get("run") or raw.get("setup"):
+        return raw
+    fixed = dict(raw)
+    for key in ("name", "repo", "branch", "desc", "setup", "run",
+                "enabled", "auto_start", "expose_port", "prefix_api", "env"):
+        if key in entry and fixed.get(key) != entry[key]:
+            fixed[key] = entry[key]
+    return fixed
+
+
 def _normalize_existing(cfg: dict) -> bool:
     """把 config.json 里的既有条目过一遍 normalize_app，返回是否发生改动。
 
     升级迁移用：老版本写下的条目不含 expose_port 等后加的键，直接按新 schema
     读取会 KeyError。这里只补字段、不动端口（reassign_port=False），
     保证「用户改过的配置不被覆盖」这条约定依然成立。
+
+    唯一的例外是**空占位条目**（run 与 setup 都为空），它会被清单补齐 ——
+    见 _backfill_placeholder 的说明。
     """
     apps: list[dict] = cfg["apps"]
+    builtin = {a["id"]: a for a in catalog.BUILTIN_APPS}
     changed = False
     for idx, raw in enumerate(list(apps)):
-        fixed = normalize_app(dict(raw), cfg["settings"], apps)
+        base = dict(raw)
+        entry = builtin.get(raw.get("id"))
+        if entry is not None:
+            base = _backfill_placeholder(base, entry)
+        fixed = normalize_app(base, cfg["settings"], apps)
         if fixed != raw:
             apps[idx] = fixed
             changed = True
@@ -191,6 +219,14 @@ def normalize_app(raw: dict, settings: dict, apps: list[dict],
         # 根路径（例如 Octop 前端用的是 window.location.host + /api/...），
         # 挂在路径前缀下必然 404，只能让它独占一个端口。
         "expose_port": bool(raw.get("expose_port", False)),
+        # 路径前缀 API 重写：应用前端把接口地址写成根相对（例如 AIVideoStudio 里的
+        # `new URL(path, location.origin)` + '/api/v2/...'），挂在 /p/<id>/ 下会被解析到
+        # **面板根路径**而 404。它的静态资源能靠 HTML 属性重写正常加载，所以症状很有
+        # 迷惑性：页面骨架出来了、js/css 也 200，但接口全 404，界面是一片错误文案。
+        # 勾上后反代会往页面注入一段同源脚本（proxy.SHIM_PATH），把运行时的 fetch/XHR
+        # 根相对请求补回前缀。只能走独立端口的应用（expose_port，例如 Octop 还有
+        # WebSocket 流量，shim 兜不住）不要勾这一项。
+        "prefix_api": bool(raw.get("prefix_api", False)),
         "env": {str(k): str(v) for k, v in (raw.get("env") or {}).items()},
     }
     used = {a["port"] for a in apps if a.get("id") != app["id"]}

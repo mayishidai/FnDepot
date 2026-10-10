@@ -99,6 +99,12 @@
           勾选后卡片「打开」直跳 <code>http://面板主机:端口/</code>，需该端口已在 compose 中发布）</span>
       </label>
       <label class="check">
+        <input id="f-prefix-api" type="checkbox">
+        <span>路径前缀 API 重写（应用前端把接口地址写成根相对 <code>/api/...</code>，挂在
+          <code>/p/&lt;id&gt;/</code> 下会请求到面板根路径而 404；勾选后反代会往页面注入一段
+          同源脚本，把运行时的 fetch/XHR 前缀补回去）</span>
+      </label>
+      <label class="check">
         <input id="f-enabled" type="checkbox" checked>
         <span>启用该应用（取消勾选则置灰为「待启用」，不参与自启与更新检测）</span>
       </label>

@@ -235,6 +235,7 @@ function openAppModal(app) {
   $("#f-env").value = app ? Object.entries(app.env || {}).map(([k, v]) => `${k}=${v}`).join("\n") : "";
   $("#f-enabled").checked = app ? app.enabled !== false : true;
   $("#f-expose").checked = app ? !!app.expose_port : false;
+  $("#f-prefix-api").checked = app ? !!app.prefix_api : false;
   $("#f-autostart").checked = app ? !!app.auto_start : true;
   $("#f-clone").checked = !app;
   $("#modal-app").hidden = false;
@@ -265,6 +266,7 @@ $("#btn-save-app").addEventListener("click", async () => {
     env: parseEnv($("#f-env").value),
     enabled: $("#f-enabled").checked,
     expose_port: $("#f-expose").checked,
+    prefix_api: $("#f-prefix-api").checked,
     auto_start: $("#f-autostart").checked,
     clone_now: $("#f-clone").checked,
   };

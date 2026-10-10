@@ -7,6 +7,9 @@
 #   node 22    —— mini_games 后端用了 node:sqlite + --experimental-sqlite，要求 Node >= 22.5；
 #                 Debian bookworm 自带的 nodejs 是 18，跑不起来，必须单独装。
 #   esbuild    —— mini_games 的 H5 打包脚本（tools/build-sheep.mjs）通过 PATH 调用它。
+#   pnpm 9     —— AIVideoStudio 的前端（Vue+Vite）用仓库自带的 pnpm-lock.yaml 构建。
+#                 固定 9.x：它的 lockfileVersion 是 9.0；且 pnpm 10 默认拦掉依赖的
+#                 postinstall 脚本，esbuild 的平台二进制就装不上、vite build 会失败。
 #   ffmpeg     —— AIVideoStudio 的本地成片合成（ffmpeg / ffprobe）。
 FROM python:3.12-slim
 
@@ -21,13 +24,14 @@ RUN apt-get update \
         git ca-certificates curl gnupg xz-utils ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Node 22 + 全局 esbuild（版本号打印出来，构建日志里能直接确认装对了）
+# Node 22 + 全局 esbuild / pnpm（版本号打印出来，构建日志里能直接确认装对了）
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
-    && npm install -g esbuild \
+    && npm install -g esbuild pnpm@9 \
     && node -v \
     && esbuild --version \
+    && pnpm -v \
     && ffmpeg -version | head -1 \
     && git config --system --add safe.directory '*'
 

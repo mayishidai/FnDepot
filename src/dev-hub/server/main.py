@@ -1,9 +1,12 @@
 """Dev Hub —— 飞牛 fnOS 应用导航与管理面板。
 
 聚合管理自己开发的 GitHub 应用：代码更新、启动停止、日志查看、统一入口跳转。
-所有子应用在面板容器内以子进程运行，经由内置反向代理 /p/<appid>/ 访问；
-个别把资源/接口地址写死在根路径、无法挂路径前缀的应用（条目标记 expose_port），
-改用容器已发布的独立端口直连，卡片「打开」直接跳 http://<面板主机>:<port>/。
+所有子应用在面板容器内以子进程运行，经由内置反向代理 /p/<appid>/ 访问。
+应用把地址写死在根路径时按代价分档兜底（详见 server/proxy.py 的模块说明）：
+- 只写死在 HTML 属性里 → 反代自动改写；
+- 由 JS 运行时拼出来 → 条目标 prefix_api，反代注入同源 shim 把前缀补回去；
+- 连 shim 也兜不住（还有 WebSocket 等非 HTTP 流量）→ 条目标 expose_port，
+  改用容器已发布的独立端口直连，卡片「打开」直接跳 http://<面板主机>:<port>/。
 """
 from __future__ import annotations
 
@@ -481,6 +484,7 @@ async def _do_proxy(request: Request, app_id: str, rest: str) -> Response:
     return await proxy.forward(
         request, f"/p/{app_id}", rest,
         item["port"], float(cfg["settings"].get("proxy_timeout", 30)),
+        prefix_api=bool(item.get("prefix_api")),
     )
 
 
