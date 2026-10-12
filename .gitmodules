@@ -1,0 +1,18 @@
+[submodule "vendored/Octop"]
+	path = vendored/Octop
+	url = https://github.com/TencentCloud/Octop.git
+[submodule "vendored/AIVideoStudio"]
+	path = vendored/AIVideoStudio
+	url = https://github.com/mayishidai/AIVideoStudio.git
+[submodule "vendored/fund"]
+	path = vendored/fund
+	url = https://github.com/mayishidai/fund.git
+[submodule "vendored/mini_games"]
+	path = vendored/mini_games
+	url = https://github.com/mayishidai/mini_games.git
+[submodule "vendored/AIImageStudio"]
+	path = vendored/AIImageStudio
+	url = https://github.com/mayishidai/AIImageStudio.git
+[submodule "vendored/opencut-classic"]
+	path = vendored/opencut-classic
+	url = https://github.com/OpenCut-app/opencut-classic.git

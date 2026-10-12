@@ -16,6 +16,8 @@ FnDepot/
 │   └── <appid>/                # FPK 打包工程（manifest + cmd/ + config/ + app/docker/ + wizard/）
 ├── src/
 │   └── <appid>/                # 需要自建镜像的应用的源码（CI 构建推送 GHCR，不进 FPK）
+├── vendored/
+│   └── <repo>/                 # 面板托管的应用（git 子仓库，只读快照，**不参与构建**）
 ├── assets/
 │   └── icons/<appid>.png       # 应用图标
 ├── scripts/
