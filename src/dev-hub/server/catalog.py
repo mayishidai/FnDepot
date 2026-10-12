@@ -300,4 +300,69 @@ BUILTIN_APPS: list[dict] = [
             "HOSTNAME": "0.0.0.0",
         },
     },
+    {
+        # 2026-10-12：按用户决定「先做成灰色占位」——条目进清单但置灰为「待启用」
+        # （enabled=False）：不 clone、不装依赖、不参与自启与更新检测，点「启动」会被
+        # main.py 拒掉，卡片上的「打开」也变成不可点的灰按钮。要真接的时候再补
+        # setup/run 并在编辑弹窗里勾「启用」。
+        #
+        # —— 上游形态 ——
+        # DramaClaw（Elastic-2.0）是 AI 短剧生产线。官方给的是 **Docker 三容器栈**：
+        #     web(nginx，容器内 80 → 宿主 8080) → api(Python，容器内 8780) → newapi 网关(:3000)
+        # 其中网关源码在**另一个仓库**（dramaclaw-gateway），api 的聊天后端还要一个
+        # 预构建的 codex 运行时（它的 Dockerfile 用 `COPY --from=claymorelab/codex-dramaclaw`，
+        # 且那个镜像只有 linux/amd64）。这几样面板都拿不到 —— 面板只 clone 一个仓库、
+        # 只起一个进程，容器里也没有 docker。
+        #
+        # —— 面板能走的那条路（已核实，将来照此实现）——
+        # 上游原生支持「无 nginx 的便携部署」：src/novelvideo/api/app.py 里判断
+        # DRAMACLAW_FRONTEND_DIST 指向的目录存在就把 SPA 挂到 "/"（带 index.html 回落），
+        # 于是**一个进程同时提供 UI 与接口**，正好合面板的模型。
+        #   1) 装 uv：{venv}python -m pip install uv（镜像里没有 uv）
+        #   2) uv sync --frozen --no-dev（242 个锁包）。不要装 world extra ——
+        #      那是 3DGS/SHARP，要 GPU 与 rust 工具链，上游也标为可选。
+        #   3) 前端：pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend run build
+        #      （frontend/pnpm-lock.yaml 的 lockfileVersion 是 9.0，镜像里的 pnpm 9 正好能读，
+        #        与 AIVideoStudio 同一情形；package.json 里写的 pnpm@11.5.0 只是 corepack 提示）
+        #      构建时**不要**设 VITE_API_URL：留空时前端走同源相对路径 /api/...，而 api
+        #      自己伺服 SPA 时天然同源，不需要 nginx 那层反代。
+        #   4) 聊天后端：上游默认要 codex（拿不到），所以要显式
+        #      DRAMACLAW_CHAT_BACKEND=hermes，并按 scripts/setup-hermes.sh 的做法装：
+        #      clone dramaclaw/hermes-agent（**用 HTTPS** —— 容器里没有 SSH key，
+        #      脚本默认走 git@ 会失败）→ 独立 venv → editable install "[acp]" →
+        #      跑本仓库的 deploy/patch_hermes_acp_toolsets.py。这套只用 git+uv+pip，面板做得到。
+        #      容器里没有 bubblewrap（Hermes 的 Linux 沙箱），需要 SUPERTALE_ALLOW_UNSANDBOXED=1。
+        #   5) 数据目录必须重定向：上游默认 NOVELVIDEO_DATA_ROOT=/data，而面板的数据卷也是 /data，
+        #      不覆盖就会写进面板自己的配置目录里。要写成 {data}。
+        #
+        # —— 为什么先不接 ——
+        # ① 首次安装很重：242 个 PyPI 包 + 52 个 npm 包 + 再 clone 一个仓库 + vite 构建，
+        #    面板的 setup 超时是 30 分钟，有触及上限的风险；
+        # ② 装成也仍是残版：Freezone 无限画布是**另一个独立应用**（前端默认回落到
+        #    <当前主机>:5175），面板里没有它；world/3DGS 要 GPU；
+        # ③ 没有模型 key 时 UI 能开、但生成必失败 —— 它默认走官方网关 RelayClaw（要 DC key），
+        #    自建网关则要再跑一个 dramaclaw-gateway 进程。
+        # 结论：完整形态更适合发一个独立的 FPK 应用包（照上游 compose 跑三容器），
+        # 面板这张卡先占位。
+        "id": "dramaclaw",
+        "name": "DramaClaw",
+        "repo": "https://github.com/dramaclaw/dramaclaw.git",
+        "branch": "main",
+        # 直连段里当前空闲的下一个（19105/19106/19107 分别是 ai-image-studio / octop / opencut）。
+        # 将来启用时也只能走独立端口：SPA 是前端路由 + 大量视频上传下载 + SSE 进度，
+        # 挂 /p/<id>/ 路径前缀必然出问题。
+        "port": 19108,
+        "expose_port": True,
+        "desc": "AI 短剧生产线（脚本→分镜→素材→成片，Elastic-2.0）。暂为待启用占位："
+                "它完整形态是 Docker 三容器栈（api + 网关 + web），面板单进程只能跑残缺版；"
+                "接入方案与取舍见 README。",
+        # setup/run 故意留空：留空正是「占位」语义（store._backfill_placeholder）——
+        # 将来把命令补进清单后，已经部署的面板会自动把这两条补齐，不用手工改 config.json。
+        # 反过来说，只要这里写了任意一条命令，那条自动补齐逻辑就再也不会碰它。
+        "setup": "",
+        "run": "",
+        "auto_start": False,
+        "enabled": False,
+        "env": {},
+    },
 ]

@@ -82,6 +82,7 @@ FnDepot/
 | `ai-image-studio` | AIImageStudio | `main` | 19105 | 照片精修工作台（批次/版本/对比图）。**独立端口直连**；静态前端已入库，无需构建 |
 | `octop` | Octop | `main` | 19106 | 腾讯 Octop 多智能体助手。**独立端口直连**，首次启动现场构建前端 + 装 243 个锁包 |
 | `opencut` | opencut-classic | `main` | 19107 | OpenCut 视频编辑器（CapCut 替代品）。**独立端口直连**；项目数据在浏览器 IndexedDB，服务器侧基本不需数据库 |
+| `dramaclaw` | dramaclaw | `main` | 19108 | AI 短剧生产线（Elastic-2.0）。**待启用占位**（灰色卡片，暂不接入，见下） |
 
 > **`opencut` 为什么接的是 `opencut-classic` 而不是 `OpenCut-app/OpenCut`？**
 > 后者是**推倒重写中**的版本：README 自陈 being rewritten from the ground up，
@@ -105,6 +106,24 @@ FnDepot/
 > 已对本机 `store.load_config()` 实测过 NAS 的处境（既有配置 + 用户改过 `octop`）：
 > `opencut` 被追加、拿到空闲端口，`octop` 的自定义 `desc`/`run`/`env` 与端口原样保留，
 > 用户自建条目不动，二次加载幂等。判据与例外见下文「播种规则」。
+
+> **`dramaclaw` 为什么是一张灰卡片？** 它是**待启用占位**（`enabled: false`）：
+> 卡片出现在面板里但置灰、按钮禁用、状态显示「待启用」，不 clone、不装依赖、
+> 不参与自启与更新检测，点「启动」会被拒 —— `main.py` 里待启用的应用连 clone 都跳过
+> （那里的注释原文是「免得白白拉几 G 代码」，而这个仓库有 248MB）。
+> 原因：上游 DramaClaw 的完整形态是 **Docker 三容器栈**（`web`/nginx → `api` → `newapi` 网关），
+> 而面板只 clone 一个仓库、只起一个进程、容器里也没有 docker。网关源码在**另一个仓库**，
+> api 的聊天后端还要一个预构建的 codex 运行时（它的 Dockerfile 用
+> `COPY --from=claymorelab/codex-dramaclaw`，且那个镜像只有 linux/amd64）——
+> 这几样面板都拿不到。所以面板最多只能得到残版：缺 Freezone 画布（那是另一个独立应用）、
+> 缺 GPU 相关特性，且没有模型 key 时生成必失败（它默认走官方网关，要 DC key）。
+> 将来要真接，路子已经查明、写在 `server/catalog.py` 该条目的注释里：上游原生支持
+> 「无 nginx 的便携部署」—— 设 `DRAMACLAW_FRONTEND_DIST` 指向前端产物目录，
+> api 就把 SPA 挂到 `/`，**一个进程同时提供 UI 与接口**；聊天后端改用 hermes 即可
+> （`scripts/setup-hermes.sh` 只用 git + uv + pip，面板做得到）。
+> ⚠️ 一个交互细节：该条目的 `run` 与 `setup` 现在都留空，正好命中「空占位」规则 ——
+> 所以**只在编辑弹窗里勾「启用」而不填启动命令，下次加载配置会被清单重置回「待启用」**
+> （已实测）。要真正启用，必须同时把启动命令填上；一旦填了，这条规则就再也不会碰它。
 
 播种规则：**只补缺、不覆盖**——已存在的条目（含你改过的字段）一律不动；
 在面板里删掉某个内置条目会记进 `config.removed`，之后不再自动补回。
