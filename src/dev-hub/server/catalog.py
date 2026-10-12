@@ -44,6 +44,13 @@ run / setup / env 的值里可以写占位符，启动或安装时由 procs._ren
 """
 from __future__ import annotations
 
+# 条目可选带 "cmd_rev"（内置命令修订版，缺省 0）。它补的是「播种只补缺、不覆盖」
+# 这条契约的盲区：配置一旦播种进 config.json 就固定下来，我们**修正自己写的内置
+# 命令**时（例如修掉 Octop 的 venv 错配），老配置里那条旧命令永远优先，修复根本
+# 到不了已经部署过的环境。store._upgrade_builtin_cmds 会在 load_config 时比较这里的
+# cmd_rev 与配置里的值，只有当 catalog 更大时才用本文件的 run/setup 覆盖过去。
+# 所以：改了某个内置应用的 run/setup 且希望已部署的配置也跟上，**必须**把该条目的
+# cmd_rev 加一，否则改动只会对新环境生效。
 BUILTIN_APPS: list[dict] = [
     {
         "id": "ai-video-studio",
@@ -170,6 +177,15 @@ BUILTIN_APPS: list[dict] = [
     {
         "id": "octop",
         "name": "Octop",
+        # cmd_rev=1：下面这套命令是修过 venv 错配之后的版本（原先 setup 建 .uv、run 却
+        # 从 .venv 起，一启动就 `.venv/bin/octop: not found`，详见下方 setup 里的说明）。
+        # 老配置里是 cmd_rev 缺省=0 的旧命令（.venv + `run build` + 无 uv 镜像加速），
+        # 靠 store._upgrade_builtin_cmds 在 load_config 时自动刷成下面这份。
+        "cmd_rev": 1,
+        # 上一版的 run 原样留在这里：闸门只在配置里的 run **恰是这一条**时才动手 ——
+        # 那说明这条命令是我们播种下去的，而不是用户自己写的。于是用户改过的启动命令
+        # 永远不会被覆盖（这是「不覆盖用户配置」那条约定的延续）。
+        "cmd_prev_run": "{venv}octop run --host 0.0.0.0 --port {port}",
         "repo": "https://github.com/TencentCloud/Octop.git",
         "branch": "main",
         "port": 19106,

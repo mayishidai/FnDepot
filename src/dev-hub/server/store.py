@@ -91,11 +91,14 @@ def load_config() -> dict:
         cfg["apps"] = apps if isinstance(apps, list) else []
         removed = cfg.get("removed")
         cfg["removed"] = [str(x) for x in removed] if isinstance(removed, list) else []
-        # 先补全老条目的新字段，再播种缺失的内置应用（播种依赖归一化后的清单）。
-        # 注意两个都要跑，别用 `a() or b()` 短路——迁移为真时 b 就再也不会执行了。
+        # 先补全老条目的新字段，再播种缺失的内置应用（播种依赖归一化后的清单），
+        # 最后把内置命令升到 catalog 声明的 cmd_rev —— 我们修正过自己的内置命令时，
+        # 只有这一步能把新命令推到**已经存在**的老配置上（见 _upgrade_builtin_cmds）。
+        # 注意三步都要跑，别用 `a() or b()` 短路——前一步为真时后面就再也不会执行了。
         migrated = _normalize_existing(cfg)
         seeded = _seed_builtins(cfg)
-        if migrated or seeded:
+        upgraded = _upgrade_builtin_cmds(cfg)
+        if migrated or seeded or upgraded:
             save_config(cfg)
         return cfg
 
@@ -164,6 +167,53 @@ def _seed_builtins(cfg: dict) -> bool:
     return changed
 
 
+def _upgrade_builtin_cmds(cfg: dict) -> bool:
+    """把内置应用的 run/setup 升级到 catalog 当前声明的 cmd_rev；返回是否发生改动。
+
+    补的是「播种只补缺、不覆盖」这条契约的盲区：我们**修正自己写的内置命令**时
+    （例如修掉 Octop 的 venv 错配），老配置里那条旧命令永远优先，修复根本到不了
+    已经部署过的环境 —— _backfill_placeholder 只在 run/setup 同时为空时才覆盖，
+    非空的老条目永远走不到那条路径。
+
+    两道闸门：
+    * cmd_rev：配置里的值（缺省 0）必须小于 catalog 的，才会有升级动作；
+    * cmd_prev_run：配置里的 run 还必须**恰好等于** catalog 记下的上一版命令原文，
+      才认定「这条是我们播种下去的」并覆盖。用户自己改过的 run 对不上指纹 → 跳过，
+      只把 cmd_rev 标记成“已评估”。
+
+    两者结合后，**只有我们自己播种的旧命令**会被升级，用户的自定义依旧不被覆盖。
+    每次动作都会往事件日志记一条，用户在「事件」里能看到是哪条被换成了哪一版。
+    """
+    builtin = {a["id"]: a for a in catalog.BUILTIN_APPS}
+    changed = False
+    for item in cfg["apps"]:
+        entry = builtin.get(item.get("id"))
+        if entry is None:
+            continue
+        want = int(entry.get("cmd_rev") or 0)
+        have = int(item.get("cmd_rev") or 0)
+        if want <= have:
+            continue
+        # 指纹闸门：只有配置里的 run **恰是上一版播种下去的那条**才覆盖，
+        # 于是用户自己改过的启动命令永远不会被这个闸门刷掉。
+        # （catalog 没声明 cmd_prev_run 时才退化成无条件覆盖。）
+        prev = entry.get("cmd_prev_run")
+        if prev is not None and (item.get("run") or "").strip() != str(prev).strip():
+            item["cmd_rev"] = want      # 标记已评估，免得每次加载都重判
+            changed = True
+            append_event(
+                f"{item['id']}: 启动命令是自定义的，跳过内置命令升级（cmd_rev→{want}）")
+            continue
+        item["cmd_rev"] = want
+        for key in ("run", "setup"):
+            new = entry.get(key)
+            if new is not None and item.get(key) != new:
+                item[key] = new
+        changed = True
+        append_event(f"{item['id']}: 内置命令已升级到 cmd_rev={want}")
+    return changed
+
+
 def is_builtin(app_id: str) -> bool:
     return any(item["id"] == app_id for item in catalog.BUILTIN_APPS)
 
@@ -228,6 +278,10 @@ def normalize_app(raw: dict, settings: dict, apps: list[dict],
         # WebSocket 流量，shim 兜不住）不要勾这一项。
         "prefix_api": bool(raw.get("prefix_api", False)),
         "env": {str(k): str(v) for k, v in (raw.get("env") or {}).items()},
+        # 内置命令修订版：仅供 _upgrade_builtin_cmds 判断「catalog 的命令是否比配置里的新」。
+        # 本函数是**显式枚举键**的白名单，不在这里列出来的字段会在读写配置时被丢掉，
+        # 闸门就永远打不开 —— 以后加新字段时务必同步这里。
+        "cmd_rev": int(raw.get("cmd_rev") or 0),
     }
     used = {a["port"] for a in apps if a.get("id") != app["id"]}
     if not app["port"] or (reassign_port and app["port"] in used):
