@@ -100,6 +100,12 @@ FnDepot/
 > 改 `config.json` 里 `opencut` 的 `DATABASE_URL` 与 `UPSTASH_REDIS_REST_*` 再点「重装依赖」。
 > 注意 `NEXT_PUBLIC_*` 会被**打进前端产物**，改了必须重装依赖才生效。
 
+> **怎么把 `opencut` 卡片拿到手？** 拉新镜像重启面板就行，不用手工改配置。
+> 它属于「上次加载配置时还不存在」的内置应用，下次加载会被自动补进 `config.json`。
+> 已对本机 `store.load_config()` 实测过 NAS 的处境（既有配置 + 用户改过 `octop`）：
+> `opencut` 被追加、拿到空闲端口，`octop` 的自定义 `desc`/`run`/`env` 与端口原样保留，
+> 用户自建条目不动，二次加载幂等。判据与例外见下文「播种规则」。
+
 播种规则：**只补缺、不覆盖**——已存在的条目（含你改过的字段）一律不动；
 在面板里删掉某个内置条目会记进 `config.removed`，之后不再自动补回。
 
@@ -328,6 +334,9 @@ uv 也拿不到缓存目录。
 > 装不了全局包（`npm i -g` 会 EACCES），所以子应用「缺什么运行时就在镜像里加」。
 > `bun` 特意选 baseline 构建：普通 x64 构建要求 CPU 支持 AVX2，
 > 而不少飞牛设备是老的 Celeron/Atom，跑起来会直接「Illegal instruction」。
+> 装进镜像这件事本身可查：CI 构建日志里有 `#10 0.927 1.2.18`，
+> 那就是 `bun --version` 的实际输出（与仓库钉的 `packageManager: bun@1.2.18` 一致）；
+> 已发布镜像的 `config.history` 里也有这条 `RUN`，且不是 empty layer。
 > 若某个应用需要其他运行时，编辑 `src/dev-hub/Dockerfile` 后推送到 `main` 即会自动重建镜像。
 
 ## GitHub 用户名
