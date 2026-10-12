@@ -184,6 +184,9 @@ BUILTIN_APPS: list[dict] = [
         # 注意：这套 setup 是 POSIX shell 专有的（if/fi、test、/dev/urandom、`VAR=值 cmd`
         # 前缀），只能在 Linux 容器里跑。在 Windows 上 procs._prepare_setup 会提前拦下并
         # 明确告知，不会跑到一半才炸。
+        #
+        # ⚠️ 这里是**唯一**用 .uv 而不是 .venv 的应用（见下方 setup 里的说明）。
+        # 所以 setup 与 run 必须**同时**写成 .uv，任何一方写错都会导致「装好了却起不来」。
         "setup": (
             "set -e\n"
             "# 每步先打一行阶段标记。这套 setup 只可能在 Linux 容器里跑（Windows 上会被\n"
@@ -194,16 +197,33 @@ BUILTIN_APPS: list[dict] = [
             "# 必须现场 npm ci + vite build；产物直接落到 src/octop/dashboard，不影响 git 状态。\n"
             "npm --prefix dashboard ci\n"
             "echo '==> 阶段 2/4：前端构建（vite build，antd 模块极多，要够内存）'\n"
-            "NODE_ENV=production npm --prefix dashboard run build\n"
-            "# Python：按仓库 uv.lock 锁定安装（uv 本身只装一次）\n"
+            # 用 build:docker 而不是 build：后者是 `tsc -b && vite build`，会跑一遍全量
+            # 类型检查（antd + monaco + mermaid 这套规模，慢且吃内存）；官方两个 Dockerfile
+            # （docker/Dockerfile 与 fnos/docker/Dockerfile）用的都是 build:docker（只 vite build）。
+            "NODE_ENV=production npm --prefix dashboard run build:docker\n"
+            # Python：按仓库 uv.lock 锁定安装（uv 本身只装一次）。
+            #
+            # ⚠️ 这套环境叫 .uv 而不是 .venv，是刻意的：Octop 是 uv 项目（仓库带 uv.lock，
+            # 243 个锁包），官方两个 Dockerfile 走的都是 uv 那条路。但面板的 {venv} 默认指
+            # .venv —— 所以这里必须**整套**改用 {venv:.uv}，包括下面 run 那一行和 init 那行。
+            # 曾经 setup 建 .uv、run 却从 .venv 起，结果是「包都装好了，一启动就
+            # .venv/bin/octop: not found」：两个占位符指向不同目录，谁也没报错。
             "echo '==> 阶段 3/4：Python 依赖（uv sync --frozen，按 uv.lock 锁包）'\n"
+            # uv 用 pip 装一次即可。之后所有 python 操作都走 uv（官方注释明说 pip 解析
+            # octop-harness[all] 这棵依赖树会卡死）。
             "test -x {venv:.uv}uv || { {python} -m venv .uv && {venv:.uv}python -m pip install -q -U pip uv; }\n"
+            # 镜像加速：uv.lock 里 243 个包合计约 620 MB（pymupdf 84MB / opencv 78MB /
+            # playwright 45MB / pillow 45MB…），从 NAS 直连 files.pythonhosted.org 会慢到超时。
+            # 照抄官方 fnos Dockerfile 的写法：阿里云源为主、PyPI 为兜底（新包镜像可能还没同步）。
+            "UV_DEFAULT_INDEX=https://pypi.org/simple \\\n"
+            "UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple \\\n"
+            "UV_INSECURE_HOST=mirrors.aliyun.com \\\n"
             "{venv:.uv}uv sync --frozen --no-dev\n"
             "# 首次初始化管理员；已有库则跳过，保证 setup 可重复执行（更新代码后会重跑）\n"
             "if [ ! -f \"$OCTOP_HOME/octop.db\" ]; then\n"
             "  echo '==> 阶段 4/4：初始化数据库与管理员账号'\n"
             "  PW=\"Oc1$(od -An -N8 -tx1 /dev/urandom | tr -d ' \\n')\"\n"
-            "  {venv}octop init --yes --admin-username admin --admin-password \"$PW\"\n"
+            "  {venv:.uv}octop init --yes --admin-username admin --admin-password \"$PW\"\n"
             "  printf '\\n============================================\\n"
             " Octop 初始账号：admin / %s\\n"
             " （登录后请尽快改密码，退出后再也看不到）\\n"
@@ -211,7 +231,8 @@ BUILTIN_APPS: list[dict] = [
             "fi"
         ),
         # 直连访问时来源在容器外，必须监听 0.0.0.0（不能像 AIVideoStudio 那样只绑 loopback）。
-        "run": "{venv}octop run --host 0.0.0.0 --port {port}",
+        # ⚠️ 必须用 {venv:.uv} 与上面的 setup 对齐：这是本仓库唯一不是 .venv 的应用。
+        "run": "{venv:.uv}octop run --host 0.0.0.0 --port {port}",
         "auto_start": True,
         "enabled": True,
         # 数据落在面板的数据卷里：OCTOP_HOME 是 Octop 唯一认的安装根（~/.octop 的替代）。

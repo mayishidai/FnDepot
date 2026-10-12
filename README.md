@@ -80,7 +80,7 @@ FnDepot/
 | `mini-games` | mini_games | `main` | 19103 | 用 esbuild 打包 `games/sheep` 并托管 H5 |
 | `mini-games-api` | mini_games | `main` | 19104 | 羊了个羊后端（Node 内置 sqlite） |
 | `ai-image-studio` | AIImageStudio | `main` | 19105 | 照片精修工作台（批次/版本/对比图）。**独立端口直连**；静态前端已入库，无需构建 |
-| `octop` | Octop | `main` | 19106 | 腾讯 Octop 多智能体助手。**独立端口直连**，首次启动现场构建前端 + 装 243 个锁包 |
+| `octop` | Octop | `main` | 19106 | 腾讯 Octop 多智能体助手。**独立端口直连**；唯一用 `.uv/` 的应用，首次启动现场构建前端 + 下约 620 MB 的 243 个锁包 |
 | `opencut` | opencut-classic | `main` | 19107 | OpenCut 视频编辑器（CapCut 替代品）。**独立端口直连**；项目数据在浏览器 IndexedDB，服务器侧基本不需数据库 |
 | `dramaclaw` | dramaclaw | `main` | 19108 | AI 短剧生产线（Elastic-2.0）。**待启用占位**（灰色卡片，暂不接入，见下） |
 
@@ -336,6 +336,14 @@ uv 也拿不到缓存目录。
   需要这类能力请改用独立端口直连。
 - **Octop 只能在容器里安装。** 它的脚本用了 `if/fi`、`test -x`、`/dev/urandom`，
   在 Windows 上会被面板提前拦下并提示，而不是跑到一半才失败。
+- **Octop 是唯一用 `.uv/` 而不是 `.venv/` 的应用。** 它是 uv 项目（仓库带 `uv.lock`，
+  243 个锁包），所以安装走 `uv sync`，包全落在 `.uv/` 下。**它的 `setup`、`run`、
+  `octop init` 三处必须同时写 `{venv:.uv}`** —— 面板的 `{venv}` 默认指 `.venv`，
+  曾经 setup 建 `.uv`、run 却从 `.venv` 起，结果「依赖装好了、一启动就
+  `.venv/bin/octop: not found`」，而两边都不报错，日志里一片正常。
+  `verify_render.py` 现在有一条断言专门盯着「setup 与 run 必须指向同一套环境」。
+  另外它的 243 个包合计约 **620 MB**（pymupdf 84MB / opencv 78MB / playwright 45MB…），
+  安装时已按官方写法接阿里云 PyPI 镜像，否则从 NAS 直连 pypi.org 会慢到超时。
 - **被弄坏的虚拟环境不会自愈。** 安装中途被打断（容器重启等）可能留下半成品 venv，
   而 `python -m venv` 对已存在的 venv 只补写不修复、`ensurepip` 见 dist-info 还在
   也会跳过。此时需手动删掉应用目录下的 `.venv` 再点「重装依赖」。
