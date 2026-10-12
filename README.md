@@ -81,6 +81,24 @@ FnDepot/
 | `mini-games-api` | mini_games | `main` | 19104 | 羊了个羊后端（Node 内置 sqlite） |
 | `ai-image-studio` | AIImageStudio | `main` | 19105 | 照片精修工作台（批次/版本/对比图）。**独立端口直连**；静态前端已入库，无需构建 |
 | `octop` | Octop | `main` | 19106 | 腾讯 Octop 多智能体助手。**独立端口直连**，首次启动现场构建前端 + 装 243 个锁包 |
+| `opencut` | opencut-classic | `main` | 19107 | OpenCut 视频编辑器（CapCut 替代品）。**独立端口直连**；项目数据在浏览器 IndexedDB，服务器侧基本不需数据库 |
+
+> **`opencut` 为什么接的是 `opencut-classic` 而不是 `OpenCut-app/OpenCut`？**
+> 后者是**推倒重写中**的版本：README 自陈 being rewritten from the ground up，
+> 工具链要 proto + moon + bun + rust，`apps/web` 只有 `dev`(`vite dev`) / `build` /
+> `preview` / `deploy`(`wrangler deploy`) —— **没有任何生产常驻服务命令**，
+> 产物目标是 Cloudflare Workers。面板要的是「起一个进程占一个端口」，它提供不了。
+> `opencut-classic` 就是新版 README 明确指向的「今天该用的版本」，Next.js 16、
+> `build`/`start` 齐全；代价是它**已归档**（2026-05 后不再维护）。
+
+> **`opencut` 的数据库/Redis 基本用不到。** 项目数据存在浏览器 IndexedDB；
+> 服务器侧只有 `/api/auth/*`（UI 里其实**没有任何登录入口**，`auth/client.ts` 零引用）、
+> `/api/feedback`、`/api/sounds/search`（限流）会碰它。
+> 但 `apps/web/src/env/web.ts` 的 zod 是在**模块加载时**就 `parse(process.env)` 的，
+> 少一个变量 `next build` 就失败（上游 Dockerfile 也是专门塞了一套 stub 值过校验）。
+> 所以清单里先给的是占位值 —— 编辑器照常能用；要接真实 Postgres/Redis，
+> 改 `config.json` 里 `opencut` 的 `DATABASE_URL` 与 `UPSTASH_REDIS_REST_*` 再点「重装依赖」。
+> 注意 `NEXT_PUBLIC_*` 会被**打进前端产物**，改了必须重装依赖才生效。
 
 播种规则：**只补缺、不覆盖**——已存在的条目（含你改过的字段）一律不动；
 在面板里删掉某个内置条目会记进 `config.removed`，之后不再自动补回。
@@ -302,9 +320,14 @@ uv 也拿不到缓存目录。
 `config.json` 是配置，`apps/<id>/` 是 clone 的代码，`logs/` 是日志。
 卸载应用不会删除该目录。
 
-> 面板镜像内置 `git`、`python3`、**Node 22**、`esbuild` 与 `ffmpeg`——前两者供
-> Python/JS 子应用使用，Node 22 是 `mini_games` 后端（`node:sqlite`）的硬要求，
-> `esbuild` 用于打包 H5，`ffmpeg` 供 `AIVideoStudio` 合成成片。
+> 面板镜像内置 `git`、`python3`、**Node 22**、`esbuild`、`pnpm 9`、**`bun`** 与 `ffmpeg`——
+> 前两者供 Python/JS 子应用使用，Node 22 是 `mini_games` 后端（`node:sqlite`）的硬要求，
+> `esbuild` 用于打包 H5、`pnpm` 给 `AIVideoStudio` 构建前端、
+> `bun` 是 `opencut-classic` 的包管理器（该仓库只有 `bun.lock`），`ffmpeg` 供合成成片。
+> 这些运行时都是**以 root 装进镜像**的：面板本身以非 root 的 `package` 用户运行，
+> 装不了全局包（`npm i -g` 会 EACCES），所以子应用「缺什么运行时就在镜像里加」。
+> `bun` 特意选 baseline 构建：普通 x64 构建要求 CPU 支持 AVX2，
+> 而不少飞牛设备是老的 Celeron/Atom，跑起来会直接「Illegal instruction」。
 > 若某个应用需要其他运行时，编辑 `src/dev-hub/Dockerfile` 后推送到 `main` 即会自动重建镜像。
 
 ## GitHub 用户名

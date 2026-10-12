@@ -10,6 +10,9 @@
 #   pnpm 9     —— AIVideoStudio 的前端（Vue+Vite）用仓库自带的 pnpm-lock.yaml 构建。
 #                 固定 9.x：它的 lockfileVersion 是 9.0；且 pnpm 10 默认拦掉依赖的
 #                 postinstall 脚本，esbuild 的平台二进制就装不上、vite build 会失败。
+#   bun 1.2.18 —— opencut-classic 是 bun 工作区（只有 bun.lock，没有 npm/pnpm 的 lockfile）。
+#                 固定版本：对齐它 package.json 里的 packageManager。
+#                 只用于「装依赖 + 构建」，运行 Next standalone 用镜像自带的 node。
 #   ffmpeg     —— AIVideoStudio 的本地成片合成（ffmpeg / ffprobe）。
 FROM python:3.12-slim
 
@@ -40,6 +43,20 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && pnpm -v \
     && ffmpeg -version | head -1 \
     && git config --system --add safe.directory '*'
+
+# bun —— opencut-classic 的锁文件是 bun.lock、packageManager 钉的是 bun@1.2.18，
+# 用 npm/pnpm 装会退化成「按 semver 重新解析」（仓库里没有它们的 lockfile）。
+# 面板以非 root 的 package 用户运行，装不了全局包，所以只能在这里以 root 装进镜像。
+# 取 **baseline** 而不是普通 x64 构建：普通构建要求 CPU 有 AVX2，而不少飞牛设备是
+# 老的 Celeron/Atom（Silvermont 那一代没有 AVX2），跑起来会直接「Illegal instruction」。
+# baseline 在所有 x64 上都能跑，只慢一点点 —— 这点性能不值得拿兼容性去赌。
+# 用 python3 的 zipfile 解压：镜像里已经有 python3，免得为了 unzip 再去动 apt 那一层。
+RUN curl -fsSL -o /tmp/bun.zip \
+        "https://github.com/oven-sh/bun/releases/download/bun-v1.2.18/bun-linux-x64-baseline.zip" \
+    && python3 -c "import zipfile; zipfile.ZipFile('/tmp/bun.zip').extractall('/tmp/bun')" \
+    && install -m 0755 /tmp/bun/bun-linux-x64-baseline/bun /usr/local/bin/bun \
+    && rm -rf /tmp/bun.zip /tmp/bun \
+    && bun --version
 
 WORKDIR /opt/dev-hub
 

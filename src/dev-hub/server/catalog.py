@@ -218,4 +218,86 @@ BUILTIN_APPS: list[dict] = [
         # 放在 /data 下而不是应用目录里，既随卷持久化，又不会把 git 工作区弄脏。
         "env": {"OCTOP_HOME": "/data/octop-home/.octop"},
     },
+    {
+        "id": "opencut",
+        "name": "OpenCut",
+        # 接入的是 **opencut-classic**，不是用户最初给的 OpenCut-app/OpenCut。
+        # 那个仓库是「推倒重写中」的版本：README 自己写了 being rewritten from the
+        # ground up，工具链要 proto + moon + bun + rust，apps/web 只有
+        # dev(vite dev) / build / preview / deploy(wrangler) —— **没有任何生产常驻
+        # 服务命令**，产物目标是 Cloudflare Workers。面板要的是「起一个进程占一个端口」，
+        # 它提供不了，所以接不了。
+        # classic 就是新版 README 里明确指向的「今天该用的版本」，Next.js 16，
+        # build/start 齐全。代价：它已归档（2026-05 之后不再维护）。
+        "repo": "https://github.com/OpenCut-app/opencut-classic.git",
+        "branch": "main",
+        "port": 19107,
+        # 独立端口直连。Next 的 basePath 只能在 next.config.ts 里**构建期**指定
+        # （全仓库都搜不到 basePath），而面板的反代是运行时往 HTML/JS 里注入前缀的 ——
+        # 已经编进产物的 /_next/static/... 与 RSC 请求路径改不了，挂 /p/opencut/ 下必然 404。
+        "expose_port": True,
+        "desc": "免费的本地视频编辑器（CapCut 替代品，MIT）。预览与导出走 WASM 在浏览器里完成，"
+                "项目数据存在浏览器 IndexedDB，不上传服务器。以独立端口直连：点「打开」跳 "
+                "NAS:19107。首次安装要现场装依赖并构建，耗时约十几分钟。",
+        # 这套 setup 是 POSIX shell 专有的（多行 + rm/cp + test -d），只能在 Linux 容器里跑。
+        # 注意用的是 test -d 而不是别的写法：它正好命中 procs._POSIX_ONLY_RE，于是
+        # Windows 上会被提前拦下并给出明确结论，而不是跑到 bun 那一步才报「找不到命令」。
+        "setup": (
+            "set -e\n"
+            "# 仓库是 bun 工作区：只有 bun.lock，没有 npm/pnpm 的 lockfile。bun 由镜像提供\n"
+            "# （见 Dockerfile），版本对齐它 package.json 里的 packageManager: bun@1.2.18。\n"
+            "# 依赖树里有 sharp / @napi-rs/canvas / @huggingface/transformers 这类带原生二进制\n"
+            "# 或体积很大的包，这一步偏慢；--frozen-lockfile 保证按仓库锁定的版本装。\n"
+            "echo '==> 阶段 1/3：安装依赖（bun install --frozen-lockfile）'\n"
+            "bun install --frozen-lockfile\n"
+            "# 构建走仓库自己的脚本（turbo run build --filter=@opencut/web → next build），\n"
+            "# next.config.ts 里 output: \"standalone\"。\n"
+            "echo '==> 阶段 2/3：构建前端（turbo → next build）'\n"
+            "bun run build:web\n"
+            "# Next 的 standalone 产物**不会**自动带上 public/ 与 .next/static/，\n"
+            "# 必须手工拷进去（上游 Dockerfile 的 runner 阶段也是这么拷的），否则页面能开、\n"
+            "# 但 js/css 全 404，一片空白。standalone 里 server.js 的位置由 tracingRoot 决定，\n"
+            "# 而 Next 认 bun.lock（dist/lib/find-root.js 里明确列了），所以 tracingRoot 是\n"
+            "# 仓库根，路径是 .../standalone/apps/web/server.js。\n"
+            "echo '==> 阶段 3/3：把 public 与 .next/static 补进 standalone'\n"
+            "test -d apps/web/.next/standalone/apps/web || "
+            "{ echo 'standalone 产物不存在，说明上一步 next build 没成功'; exit 1; }\n"
+            "rm -rf apps/web/.next/standalone/apps/web/public "
+            "apps/web/.next/standalone/apps/web/.next/static\n"
+            "cp -r apps/web/public apps/web/.next/standalone/apps/web/public\n"
+            "cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static"
+        ),
+        # 用 node 而不是 bun 跑 Next 的 standalone 服务：server.js 就是给 node 写的
+        # （模板见 next/dist/build/utils.js），node 22 也已随镜像装好，运行期少一个变量。
+        # 不需要写 cd：模板里有 process.env.NODE_ENV='production' 与 process.chdir(__dirname)，
+        # 所以 cwd 在哪都行、NODE_ENV 也不用我们注入（它的 zod 校验因此能过）。
+        "run": "node apps/web/.next/standalone/apps/web/server.js",
+        # 视频编辑器是可选工具，而且首次要装十几分钟，不做开机自动安装。
+        "auto_start": False,
+        "enabled": True,
+        # 下面这些值在 apps/web/src/env/web.ts 里被 zod 于**模块加载时**就 parse，
+        # 少一个 build 阶段就失败 —— 上游 Dockerfile 也是专门塞了一套 stub 值过校验的。
+        # 好消息是它们基本用不到：项目数据在浏览器 IndexedDB；服务器侧只有
+        # /api/auth/*（UI 里其实**没有任何登录入口**，auth/client 零引用）、
+        # /api/feedback、/api/sounds/search（限流）会碰数据库/Redis。
+        # 所以先给占位值就能正常用编辑器；哪天要接真实的 Postgres/Redis，
+        # 把这两行改成自己的地址再点「重装依赖」即可。
+        "env": {
+            # NEXT_PUBLIC_* 会被**打进前端产物**，改了必须重装依赖才生效。
+            # 它只影响 metadata/sitemap 这类展示，不影响编辑器；想显示成自己的地址就改这里。
+            "NEXT_PUBLIC_SITE_URL": "http://localhost:19107",
+            "NEXT_PUBLIC_MARBLE_API_URL": "https://api.marblecms.com",
+            "DATABASE_URL": "postgresql://opencut:opencut@127.0.0.1:5432/opencut",
+            "BETTER_AUTH_SECRET": "opencut-local-secret-change-me",
+            "UPSTASH_REDIS_REST_URL": "http://127.0.0.1:8079",
+            "UPSTASH_REDIS_REST_TOKEN": "example_token",
+            "MARBLE_WORKSPACE_KEY": "placeholder",
+            "FREESOUND_CLIENT_ID": "placeholder",
+            "FREESOUND_API_KEY": "placeholder",
+            # 必须钉成 0.0.0.0：standalone 的 server.js 读 process.env.HOSTNAME，
+            # 缺省才回落到 0.0.0.0，而 Docker 默认会把 HOSTNAME 设成容器 ID
+            # （解析得到容器 IP）—— expose_port 是让浏览器从容器外直连，绑错了连不上。
+            "HOSTNAME": "0.0.0.0",
+        },
+    },
 ]
