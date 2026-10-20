@@ -39,7 +39,7 @@ FnDepot/
 |---|---|---|
 | Agnes AI Studio | AI赋能 | 文生图 / 图生图 / 文生视频 / 图文生视频，调用 Agnes AI 免费模型 |
 | Dev Hub 应用导航台 | 系统工具 | 聚合管理自建 GitHub 应用：更新检查、启停控制、日志、统一跳转 |
-| Octop | AI赋能 | 腾讯开源的多用户多智能体 AI 助手平台（Docker 版，跑官方 amd64/arm64 镜像，向导设管理员账号） |
+| Octop | AI赋能 | 腾讯开源的多用户多智能体 AI 助手平台（Docker 版）。**直接引用官方发布的 FPK**，本仓库不构建 |
 
 > Dev Hub 的面板镜像由 `.github/workflows/build-dev-hub-image.yml` 自动构建，
 > 改 `src/dev-hub/` 下的代码并推送到 `main` 即会重建镜像；
@@ -408,6 +408,22 @@ find . -type f \( -name '*.json' -o -name '*.yml' -o -name '*.sh' \) -exec sed -
 >
 > **新增应用**：`packages/<appid>/` 与 `apps/<appid>.json` 建好后**不要**手工登记进
 > `fnpack.json`（此时还没有 releases 元数据，校验会失败）；首次打 tag 时 CI 会自动把它登记进索引。
+
+### 不构建、只引用上游已发布的 FPK
+
+上游自己就在发 FPK 时（如 Octop），不必在本仓库重复打包：直接把 `download_url` 指向
+上游 Release 资产，填好 `sha256` / `size` 并登记索引即可。
+
+- **不要**再建 `packages/<appid>/`：CI 的发现逻辑是「`packages/<id>/` 有 `manifest`
+  且 `apps/<id>.json` 存在」，留着目录会让它**每次打 tag 都额外构建一枚我们自己的 FPK**，
+  还往 `releases` 里塞一条 tag 版本号的记录，和引用版打架。
+- 版本号键要跟 **FPK 内部 `manifest` 的 `version`** 一致（不要照抄上游 Release 的 tag ——
+  Octop 的 `Octop-fnos-docker-1.0.2.fpk` 里写的其实是 `1.0.300`）。解包看：
+  `python -c "import tarfile;print(tarfile.open('<x>.fpk').extractfile('manifest').read().decode())"`
+- `sha256` / `size` 这里**只能手工填**（没有 CI 构建可回填），所以务必跑
+  `python3 scripts/verify_source.py --remote` —— 它会真下载并比对，填错当场报错。
+- 校验会提示 `未找到 packages/<appid>/manifest`，这条警告是**预期的**。
+- 代价：上游删资产/改文件名会导致本源失效，且上游包自身的缺陷我们改不了。
 >
 > 已发布的「版本号 + 架构」FPK **不可变**（客户端做 sha256 强校验），改内容必须发新版本号。
 
@@ -472,10 +488,9 @@ CI 已在打 tag 时自动执行该脚本，校验不通过会中断发布。
   （`platform=all` 只在**产物本身与架构无关**时可用，例如 Docker 应用跑多架构官方镜像）。
 - 已发布的「版本号 + 架构」FPK 视为**不可变**，改内容必须发新版本号或新地址。
 - **多个应用共用一个 tag**：CI 会把 tag 版本号 `sed` 进每个被构建应用的 `manifest`，
-  所以「应用版本号」与「仓库 tag」是绑定的。Docker 应用若还要跟随上游镜像版本
-  （如 Octop 跟随 `ghcr.io/tencentcloud/octop:<tag>`），
+  所以「应用版本号」与「仓库 tag」是绑定的。Docker 应用若还要跟随上游镜像版本，
   `manifest` 的 `version` 与 compose 里的镜像 tag **必须一起改**，否则会打出
-  「版本号变了、跑的还是旧镜像」的包。
+  「版本号变了、跑的还是旧镜像」的包。（引用上游 FPK 的应用不受此约束，见上节。）
 - Docker 应用的 compose 里写死的宿主机路径（如 data-share 挂载点）与
   `cmd/install_callback` 写入文件的路径**必须逐字一致**。不要一个写死、一个从
   `TRIM_APPDEST` 反推 —— 两边不一致时症状是「凭据被悄悄忽略」（容器退回到自动生成

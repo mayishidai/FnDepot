@@ -1,7 +1,7 @@
 {
   "app_name": "octop",
   "display_name": "Octop",
-  "desc": "腾讯开源的多用户多智能体 AI 助手平台：Web 控制台、CLI、IM 渠道与定时任务，数据全部本地存储。本包为 Docker 版，直接运行官方镜像（amd64 / arm64 多架构），安装向导中设置管理员账号。首次登录后需在控制台「设置 → 模型」配置 API Key 才能开始对话。",
+  "desc": "腾讯开源的多用户多智能体 AI 助手平台：Web 控制台、CLI、IM 渠道与定时任务，数据全部本地存储。本条目直接引用官方发布的 Docker 版 FPK（运行官方 amd64 / arm64 多架构镜像），安装向导中设置管理员账号。首次登录后需在控制台「设置 → 模型」配置 API Key 才能开始对话；忘记密码可到数据目录 octop-login.txt 查看备份。",
   "platform": [
     "all"
   ],
@@ -16,5 +16,17 @@
   "install_type": "",
   "is_docker": true,
   "service_port": "8088",
-  "releases": {}
+  "releases": {
+    "1.0.300": {
+      "changelog": "收录 Octop 1.0.300 —— 直接引用官方 v1.0.2 Release 里的 Docker 版 FPK（非本仓库构建）。",
+      "updated_at": "2026-10-20T18:18:44+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/TencentCloud/Octop/releases/download/v1.0.2/Octop-fnos-docker-1.0.2.fpk",
+          "sha256": "19124c9605102f6386f4d417cd58b69ff535b3e2854307e33bd894ebf4c60dbb",
+          "size": 350451
+        }
+      }
+    }
+  }
 }

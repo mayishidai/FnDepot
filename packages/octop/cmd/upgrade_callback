@@ -1,8 +1,0 @@
-#!/bin/bash
-# 升级「之后」执行。
-#
-# 数据（octop.db、配置、凭据）都在 data-share 里，应用中心不会清理，无需迁移。
-#
-# 注意：compose 里钉的是 ghcr.io/tencentcloud/octop:<版本>，manifest 的 version
-# 与这一行**必须一起改**。只改 manifest 会打出「版本号变了但跑的还是旧镜像」的包。
-exit 0
