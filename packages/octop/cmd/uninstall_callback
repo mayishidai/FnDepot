@@ -1,0 +1,6 @@
+#!/bin/bash
+# 卸载「之后」执行。
+#
+# 刻意不删 data-share（/var/apps/octop/shares/data）：里面有 octop.db、
+# 配置与凭据文件。重装时它们会被接着用上；确实不要了请在文件管理器里手动删。
+exit 0

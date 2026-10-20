@@ -39,6 +39,7 @@ FnDepot/
 |---|---|---|
 | Agnes AI Studio | AI赋能 | 文生图 / 图生图 / 文生视频 / 图文生视频，调用 Agnes AI 免费模型 |
 | Dev Hub 应用导航台 | 系统工具 | 聚合管理自建 GitHub 应用：更新检查、启停控制、日志、统一跳转 |
+| Octop | AI赋能 | 腾讯开源的多用户多智能体 AI 助手平台（Docker 版，跑官方 amd64/arm64 镜像，向导设管理员账号） |
 
 > Dev Hub 的面板镜像由 `.github/workflows/build-dev-hub-image.yml` 自动构建，
 > 改 `src/dev-hub/` 下的代码并推送到 `main` 即会重建镜像；
@@ -467,6 +468,16 @@ CI 已在打 tag 时自动执行该脚本，校验不通过会中断发布。
 
 - **仓库名必须恰为 `FnDepot`**（大小写敏感）+ Public + 根目录 `fnpack.json`，客户端才按 GitHub 源识别。
 - 图标用**仓库相对路径**（相对详情 JSON 所在目录解析），不要写 `raw.githubusercontent.com` 绝对 URL。
-- `manifest` 的 `platform` **只能填一个值**；要同时支持 x86 与 arm 必须分别打两个包。
+- `manifest` 的 `platform` **只能填一个值**；要同时支持 x86 与 arm 必须分别打两个包
+  （`platform=all` 只在**产物本身与架构无关**时可用，例如 Docker 应用跑多架构官方镜像）。
 - 已发布的「版本号 + 架构」FPK 视为**不可变**，改内容必须发新版本号或新地址。
+- **多个应用共用一个 tag**：CI 会把 tag 版本号 `sed` 进每个被构建应用的 `manifest`，
+  所以「应用版本号」与「仓库 tag」是绑定的。Docker 应用若还要跟随上游镜像版本
+  （如 Octop 跟随 `ghcr.io/tencentcloud/octop:<tag>`），
+  `manifest` 的 `version` 与 compose 里的镜像 tag **必须一起改**，否则会打出
+  「版本号变了、跑的还是旧镜像」的包。
+- Docker 应用的 compose 里写死的宿主机路径（如 data-share 挂载点）与
+  `cmd/install_callback` 写入文件的路径**必须逐字一致**。不要一个写死、一个从
+  `TRIM_APPDEST` 反推 —— 两边不一致时症状是「凭据被悄悄忽略」（容器退回到自动生成
+  随机密码），而且从日志上完全看不出来。
 - `source_info.author`(源维护者) / `maintainer`(开发者) / `distributor`(发布者) 三者职责不同，不要混用。

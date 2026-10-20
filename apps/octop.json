@@ -1,0 +1,20 @@
+{
+  "app_name": "octop",
+  "display_name": "Octop",
+  "desc": "腾讯开源的多用户多智能体 AI 助手平台：Web 控制台、CLI、IM 渠道与定时任务，数据全部本地存储。本包为 Docker 版，直接运行官方镜像（amd64 / arm64 多架构），安装向导中设置管理员账号。首次登录后需在控制台「设置 → 模型」配置 API Key 才能开始对话。",
+  "platform": [
+    "all"
+  ],
+  "categories": [
+    "AI赋能"
+  ],
+  "icon_url": "../assets/icons/octop.png",
+  "maintainer": "TencentCloud",
+  "maintainer_url": "https://github.com/TencentCloud/Octop",
+  "distributor": "mayishidai",
+  "run_as": "package",
+  "install_type": "",
+  "is_docker": true,
+  "service_port": "8088",
+  "releases": {}
+}
