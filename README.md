@@ -39,8 +39,6 @@ FnDepot/
 |---|---|---|
 | Agnes AI Studio | AI赋能 | 文生图 / 图生图 / 文生视频 / 图文生视频，调用 Agnes AI 免费模型 |
 | Dev Hub 应用导航台 | 系统工具 | 聚合管理自建 GitHub 应用：更新检查、启停控制、日志、统一跳转 |
-| Octop | AI赋能 | 腾讯开源的多用户多智能体 AI 助手平台（Docker 版，端口 8088）。**直接引用官方发布的 FPK**，本仓库不构建 |
-| Octop 本地版 | AI赋能 | 同一平台的**本地版（native，端口 8089）**：不依赖 Docker，自带 Python 3.12 运行时与 Chromium，x86 / arm64 各一枚包。同样引用官方 FPK |
 
 > Dev Hub 的面板镜像由 `.github/workflows/build-dev-hub-image.yml` 自动构建，
 > 改 `src/dev-hub/` 下的代码并推送到 `main` 即会重建镜像；
@@ -84,7 +82,6 @@ FnDepot/
 | `mini-games` | mini_games | `main` | 19103 | 用 esbuild 打包 `games/sheep` 并托管 H5 |
 | `mini-games-api` | mini_games | `main` | 19104 | 羊了个羊后端（Node 内置 sqlite） |
 | `ai-image-studio` | AIImageStudio | `main` | 19105 | 照片精修工作台（批次/版本/对比图）。**独立端口直连**；静态前端已入库，无需构建 |
-| `octop` | Octop | `main` | 19106 | 腾讯 Octop 多智能体助手。**独立端口直连**；唯一用 `.uv/` 的应用，首次启动现场构建前端 + 下约 620 MB 的 243 个锁包 |
 | `opencut` | opencut-classic | `main` | 19107 | OpenCut 视频编辑器（CapCut 替代品）。**独立端口直连**；项目数据在浏览器 IndexedDB，服务器侧基本不需数据库 |
 | `dramaclaw` | dramaclaw | `main` | 19108 | AI 短剧生产线（Elastic-2.0）。**待启用占位**（灰色卡片，暂不接入，见下） |
 
@@ -107,9 +104,9 @@ FnDepot/
 
 > **怎么把 `opencut` 卡片拿到手？** 拉新镜像重启面板就行，不用手工改配置。
 > 它属于「上次加载配置时还不存在」的内置应用，下次加载会被自动补进 `config.json`。
-> 已对本机 `store.load_config()` 实测过 NAS 的处境（既有配置 + 用户改过 `octop`）：
-> `opencut` 被追加、拿到空闲端口，`octop` 的自定义 `desc`/`run`/`env` 与端口原样保留，
-> 用户自建条目不动，二次加载幂等。判据与例外见下文「播种规则」。
+> 已对本机 `store.load_config()` 实测过 NAS 的处境（既有配置 + 用户改过某个内置应用）：
+> `opencut` 被追加、拿到空闲端口，那个被改过的应用的自定义 `desc`/`run`/`env` 与端口
+> 原样保留，用户自建条目不动，二次加载幂等。判据与例外见下文「播种规则」。
 
 > **`dramaclaw` 为什么是一张灰卡片？** 它是**待启用占位**（`enabled: false`）：
 > 卡片出现在面板里但置灰、按钮禁用、状态显示「待启用」，不 clone、不装依赖、
@@ -142,7 +139,7 @@ FnDepot/
 
 **例外三：修正过的内置命令会自动升级到老配置。** 光改 catalog 到不了已经写进
 `config.json` 的条目（那就是「只补缺、不覆盖」的代价），所以我们修正自己的内置命令时
-（例如 Octop 的 venv 错配）会顺手把该条目的 `cmd_rev` 加一；加载配置时
+会顺手把该条目的 `cmd_rev` 加一；加载配置时
 `store._upgrade_builtin_cmds` 据此把老配置里的 `run`/`setup` 换成新的，并在「事件」里
 记一条 `xxx: 内置命令已升级到 cmd_rev=N`。
 两道闸门保证它只动**我们自己播种的那份**：除了 `cmd_rev` 必须更大，配置里的 `run`
@@ -183,7 +180,7 @@ new URL('/api/v2/capabilities', location.origin).toString()
 **什么时候仍然要用「独立端口直连」**：
 
 1. 应用还有 **WebSocket / SSE** 流量，或地址取自 `window.location.host` ——
-   shim 只拦 HTTP（`fetch` / `XHR`），这些它管不到（例如 `octop` 的聊天与终端走 WS）。
+   shim 只拦 HTTP（`fetch` / `XHR`），这些它管不到（聊天、终端这类走 WS 的都在此列）。
 2. 应用**在运行时用 `innerHTML` 往页面里塞根绝对地址**（缩略图 `src`、
    下载 `href`）—— 这类节点既不在初始 HTML 里（`_ATTR_RE` 看不到），
    也不经过 `fetch`/`XHR`（shim 拦不到）。**`ai-image-studio` 就是这种**：
@@ -311,10 +308,9 @@ Node 在这种情况下会以 `uv_os_homedir` ENOENT 直接抛错（`npm` 连 `n
 uv 也拿不到缓存目录。
 面板在给子进程注入环境时统一兜底成数据卷 `/data`（镜像的 `ENV` 和 compose 里也各写了
 一遍），顺带还让 uv 的缓存与 `.venv` 落在同一文件系统上 —— 默认的硬链接模式才走得通，
-缓存放容器可写层、venv 放挂载卷是会跨文件系统报错的。Octop 官方自己的 fnOS 包同样钉了
-`HOME=/data`，是同一处坑。
+缓存放容器可写层、venv 放挂载卷是会跨文件系统报错的。
 
-> 这条的判据是：官方 Octop 的 fnOS 包基于**同一个** `python:3.12-slim`，却要在
+> 这条的判据是：第三方的 fnOS 应用包基于**同一个** `python:3.12-slim`，却要在
 > Dockerfile 和 compose 里各写一遍 `HOME`；再加上 Node/libuv 的家目录回退链
 > （`$HOME` → `getpwuid`）。开发机上没有 Linux 容器，**未能实机复现**，所以按
 > 「兜住它不会有任何副作用」处理 —— 已有 `HOME` 时不覆盖，Windows 上完全不碰。
@@ -323,7 +319,7 @@ uv 也拿不到缓存目录。
 （非 UTF-8 的中文报错自动按 GBK 回退解码），失败时给出真实退出码与报错原文。
 安装期间每行输出都带时间戳和 `[setup]` 标记，与面板自己写的 `[dev-hub]` 行区分开，
 所以「卡在哪一行之后」可以直接从时间戳的间隔看出来。
-内置应用（如 Octop）的安装命令里还前置了几行 `==> 阶段 N/M` 标记，失败时能一眼
+内置应用的安装命令里还前置了几行 `==> 阶段 N/M` 标记，失败时能一眼
 定位是卡在下载、构建还是初始化，而不是只看到一句「安装失败」。
 单次安装落盘的上限是 1 MB，超出后只排空管道、不再记录（进程照常跑完），
 避免一个话痨的构建脚本把日志刷爆。
@@ -332,8 +328,8 @@ uv 也拿不到缓存目录。
 
 - **等价改写不会自动刷新，但「修正」会。** 加载配置只「补缺失的内置应用」和
   「补齐空占位条目」，已有条目的命令一律不覆盖 —— 所以**只换占位符写法、不改行为**
-  的等价改写不会同步到老配置（结果也等价，无妨）。但一旦是**修正**（例如 Octop 的
-  venv 错配那种会真出故障的 bug），我们会在清单里把该条目的 `cmd_rev` 加一，
+  的等价改写不会同步到老配置（结果也等价，无妨）。但一旦是**修正**（会真出故障的
+  bug，比如 setup 与 run 指向了不同的虚拟环境目录），我们会在清单里把该条目的 `cmd_rev` 加一，
   加载配置时自动把老配置的命令换成新的，并在「事件」里留一条
   `xxx: 内置命令已升级到 cmd_rev=N`：**拉新镜像重启面板即可，不用手动删条目**。
   判据见上文「播种规则」的例外三（`cmd_rev` + `cmd_prev_run` 指纹，你自己改过的
@@ -347,18 +343,15 @@ uv 也拿不到缓存目录。
 - **反代是整包缓冲的。** 上游响应会被完整读进内存再返回（`httpx` 非流式），
   因此**流式响应（SSE、大文件下载、进度条）在 `/p/<id>/` 下不可用**，
   需要这类能力请改用独立端口直连。
-- **Octop 只能在容器里安装。** 它的脚本用了 `if/fi`、`test -x`、`/dev/urandom`，
-  在 Windows 上会被面板提前拦下并提示，而不是跑到一半才失败。
-- **Octop 是唯一用 `.uv/` 而不是 `.venv/` 的应用。** 它是 uv 项目（仓库带 `uv.lock`，
-  243 个锁包），所以安装走 `uv sync`，包全落在 `.uv/` 下。**它的 `setup`、`run`、
-  `octop init` 三处必须同时写 `{venv:.uv}`** —— 面板的 `{venv}` 默认指 `.venv`，
-  曾经 setup 建 `.uv`、run 却从 `.venv` 起，结果「依赖装好了、一启动就
-  `.venv/bin/octop: not found`」，而两边都不报错，日志里一片正常。
-  `verify_render.py` 现在有一条断言专门盯着「setup 与 run 必须指向同一套环境」。
-  另外它的 243 个包合计约 **620 MB**（pymupdf 84MB / opencv 78MB / playwright 45MB…），
-  安装时已按官方写法接阿里云 PyPI 镜像，否则从 NAS 直连 pypi.org 会慢到超时。
-  **老配置里那套错配的旧命令不用手动改**：本条目已 `cmd_rev: 1`，加载配置时会自动
-  换成上面这套（`{venv:.uv}` + `build:docker` + 镜像加速），见「播种规则」例外三。
+- **用 POSIX shell 语法写的安装命令只能在容器里跑。** 脚本里出现 `if/fi`、`test -x`、
+  `/dev/urandom` 这类写法时，在本机（Windows）上面板会提前拦下并明确提示，
+  而不是跑到一半才失败。
+- **虚拟环境目录名可以换（`{venv:名称}`），但一处改就得处处改。** `{venv}` 默认指
+  `.venv/`，冒号后给完整目录名即可换（例如 uv 项目用 `{venv:.uv}`）。
+  同一个应用的 `setup`、`run` 以及任何直接调可执行文件的命令必须用**同一个**占位符 ——
+  曾经 setup 建一套、run 却从另一套起，结果「依赖装好了、一启动就 not found」，
+  而两边都不报错、日志里一片正常。
+  `verify_render.py` 有一条断言专门盯着「setup 与 run 必须指向同一套环境」。
 - **被弄坏的虚拟环境不会自愈。** 安装中途被打断（容器重启等）可能留下半成品 venv，
   而 `python -m venv` 对已存在的 venv 只补写不修复、`ensurepip` 见 dist-info 还在
   也会跳过。此时需手动删掉应用目录下的 `.venv` 再点「重装依赖」。
@@ -412,20 +405,19 @@ find . -type f \( -name '*.json' -o -name '*.yml' -o -name '*.sh' \) -exec sed -
 
 ### 不构建、只引用上游已发布的 FPK
 
-上游自己就在发 FPK 时（如 Octop），不必在本仓库重复打包：直接把 `download_url` 指向
-上游 Release 资产，填好 `sha256` / `size` 并登记索引即可。
+上游自己就在发 FPK 时，不必在本仓库重复打包：直接把 `download_url` 指向上游 Release
+资产，填好 `sha256` / `size` 并登记索引即可。
 
 - **不要**再建 `packages/<appid>/`：CI 的发现逻辑是「`packages/<id>/` 有 `manifest`
   且 `apps/<id>.json` 存在」，留着目录会让它**每次打 tag 都额外构建一枚我们自己的 FPK**，
   还往 `releases` 里塞一条 tag 版本号的记录，和引用版打架。
-- 版本号键要跟 **FPK 内部 `manifest` 的 `version`** 一致（不要照抄上游 Release 的 tag ——
-  Octop 的 `Octop-fnos-docker-1.0.2.fpk` 里写的其实是 `1.0.300`）。解包看：
+- 版本号键要跟 **FPK 内部 `manifest` 的 `version`** 一致（不要照抄上游 Release 的 tag，
+  两者经常不是同一个数）。解包看：
   `python -c "import tarfile;print(tarfile.open('<x>.fpk').extractfile('manifest').read().decode())"`
-- 多架构（x86 + arm64 两枚包）**不是两个版本**，而是同一个版本节点下的两个架构键
-  （见 `apps/octop-native.json`：`releases["1.0.300"].packages.{x86,arm}`），
+- 多架构（x86 + arm64 两枚包）**不是两个版本**，而是同一个版本节点下的两个架构键，
   同时 `platform` 写 `["x86","arm"]`。
   ⚠️ 键名以**实际产物架构**为准，别照抄包内 manifest 的 `platform` ——
-  Octop 的 x86 包里写的竟是 `all`，arm 包里才是 `arm`。
+  曾经见过 x86 包里写 `all`、arm 包里才写 `arm` 的。
 - `sha256` / `size` 这里**只能手工填**（没有 CI 构建可回填），所以务必跑
   `python3 scripts/verify_source.py --remote` —— 它会真下载并比对，填错当场报错。
 - 校验会提示 `未找到 packages/<appid>/manifest`，这条警告是**预期的**。

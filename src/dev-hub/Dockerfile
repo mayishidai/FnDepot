@@ -20,7 +20,7 @@ FROM python:3.12-slim
 # 非 root uid 启动容器，该 uid 在镜像 /etc/passwd 里没有条目 —— npm / uv / pip / git
 # 全都定位不到家目录（npm 会以 uv_os_homedir ENOENT 直接崩）。/data 是随卷持久化的
 # 可写目录，缓存留在这里还能让 uv 对 .venv 走硬链接（跨文件系统会退化成拷贝或报错）。
-# 官方 Octop 的 fnOS 包同样钉了 HOME=/data。
+# 第三方 fnOS 应用包也普遍这么钉 HOME，是同一处坑。
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DEVHUB_DATA=/data \

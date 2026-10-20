@@ -13,7 +13,7 @@ Windows 开发机上直接调试子应用，这里把「路径与 shell 的差�
                 cmd.exe 把 `/` 当开关分隔符，`.venv\\Scripts/python` 会直接报
                 「不是内部或外部命令」（实测 rc=1）。
     {venv:.uv}  同上，但指向另一套虚拟环境；冒号后面写的是**完整目录名**
-                （Octop 用 .uv，所以是 {venv:.uv}，别漏了开头的点）
+                （uv 项目常用 .uv，那就写 {venv:.uv}，别漏了开头的点）
     {python}    新建虚拟环境用的解释器 → python3（容器）或面板自己的解释器
     {null}      空设备 → /dev/null（容器）或 NUL（Windows）
     {port}      应用端口
@@ -279,8 +279,8 @@ def _child_env(app: dict) -> dict:
         # 于是所有靠「家目录」定位缓存/配置的工具都会哑掉：npm 直接以
         # uv_os_homedir ENOENT 崩掉（连 `npm ci` 都进不去），uv 则拿不到缓存目录。
         # npm / uv / pip / git 都要它，所以在这里统一兜底，而不是逐个应用去补。
-        # 官方 Octop 的 fnOS 包在 Dockerfile 的 ENV 与 compose 的 environment 里
-        # 各写了一遍 HOME=/data，就是为这件事。
+        # 第三方的 fnOS 应用包也都在 Dockerfile 的 ENV 与 compose 的 environment 里
+        # 各写一遍 HOME=/data，就是为这件事。
         # 指到数据卷还有个附带好处：uv 的缓存与 .venv 落在同一文件系统上，
         # 默认的硬链接模式才走得通（缓存放容器可写层、venv 放挂载卷会跨文件系统）。
         env["HOME"] = str(store.DATA_DIR)
@@ -298,7 +298,7 @@ def _prepare_setup(cmd: str) -> tuple[str, str | None]:
     会被静默吞掉：面板于是把 setup_ok 记成 true，needs_setup 之后恒为 False，
     用户再也等不到重装，界面上还显示「依赖已安装」。这是实测踩到的真缺陷。
     两种平台的加固方式不同：
-    - POSIX：前置 `set -e`（Octop 的脚本自己已经写了，这里做兜底）；
+    - POSIX：前置 `set -e`（部分应用的脚本自己已经写了，这里做兜底）；
     - Windows：cmd.exe 没有等价开关，改用 `&&` 串联（跳过空行与注释）。
       带 if/fi、test、/dev/urandom 这类语法的脚本本机确实跑不了，提前给出明确结论，
       免得用户在 `npm ci` 跑到一半才看到一堆语法报错。

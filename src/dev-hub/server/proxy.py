@@ -203,7 +203,7 @@ async def forward(request: Request, prefix: str, rest_path: str, port: int, time
 def _direct_page(app_id: str, port: int, target: str, running: bool = True) -> str:
     """「独立端口直连」应用的提示页。
 
-    这类应用的仪表盘把资源与 API 地址写死成根路径（典型是 Octop 前端用的
+    这类应用的仪表盘把资源与 API 地址写死成根路径（典型写法是
     window.location.host + /api/...），挂在 /p/<id>/ 前缀下必然 404，
     所以不走代理，改为提示用户打开它独占的那个端口。
 

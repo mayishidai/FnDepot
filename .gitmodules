@@ -1,6 +1,3 @@
-[submodule "vendored/Octop"]
-	path = vendored/Octop
-	url = https://github.com/TencentCloud/Octop.git
 [submodule "vendored/AIVideoStudio"]
 	path = vendored/AIVideoStudio
 	url = https://github.com/mayishidai/AIVideoStudio.git

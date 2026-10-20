@@ -61,7 +61,6 @@ git submodule update --remote vendored/fund   # 只刷新某一个
 | `fund` | `fund`（leekfund） | mayishidai/fund | 私有 |
 | `mini_games` | `mini-games` + `mini-games-api` | mayishidai/mini_games | 私有 |
 | `AIImageStudio` | `ai-image-studio` | mayishidai/AIImageStudio | 私有 |
-| `Octop` | `octop` | TencentCloud/Octop | 公开 |
 | `opencut-classic` | `opencut` | OpenCut-app/opencut-classic | 公开 |
 
 均为**浅克隆**（`--depth 1`）：这里只作查阅，不需要完整历史。

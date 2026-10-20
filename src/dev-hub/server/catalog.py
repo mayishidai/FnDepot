@@ -14,7 +14,7 @@ run / setup / env 的值里可以写占位符，启动或安装时由 procs._ren
                  `.venv/bin/`（容器）或 `.venv\\Scripts\\`（Windows）。
                  写法是 `{venv}python` / `{venv}pip`，**不能**写 `{venv}/python`：
                  cmd.exe 把 `/` 当开关分隔符，会报「不是内部或外部命令」。
-    {venv:.uv}   同上，但指向另一套虚拟环境；冒号后写完整目录名（Octop 用 .uv，
+    {venv:.uv}   同上，但指向另一套虚拟环境；冒号后写完整目录名（uv 项目常用 .uv，
                  所以是 {venv:.uv}，别漏了开头的点）
     {python}     新建虚拟环境用的解释器 → python3（容器）/ 面板自己的解释器（Windows）
     {null}       空设备 → /dev/null（容器）或 NUL（Windows）
@@ -46,7 +46,7 @@ from __future__ import annotations
 
 # 条目可选带 "cmd_rev"（内置命令修订版，缺省 0）。它补的是「播种只补缺、不覆盖」
 # 这条契约的盲区：配置一旦播种进 config.json 就固定下来，我们**修正自己写的内置
-# 命令**时（例如修掉 Octop 的 venv 错配），老配置里那条旧命令永远优先，修复根本
+# 命令**时（例如修掉 setup 与 run 指向了不同虚拟环境目录这种真故障），老配置里那条旧命令永远优先，修复根本
 # 到不了已经部署过的环境。store._upgrade_builtin_cmds 会在 load_config 时比较这里的
 # cmd_rev 与配置里的值，只有当 catalog 更大时才用本文件的 run/setup 覆盖过去。
 # 所以：改了某个内置应用的 run/setup 且希望已部署的配置也跟上，**必须**把该条目的
@@ -173,87 +173,6 @@ BUILTIN_APPS: list[dict] = [
         "env": {"PHOTO_WORKBENCH_DATA": "{data}/photo-workbench"},
         "auto_start": True,
         "enabled": True,
-    },
-    {
-        "id": "octop",
-        "name": "Octop",
-        # cmd_rev=1：下面这套命令是修过 venv 错配之后的版本（原先 setup 建 .uv、run 却
-        # 从 .venv 起，一启动就 `.venv/bin/octop: not found`，详见下方 setup 里的说明）。
-        # 老配置里是 cmd_rev 缺省=0 的旧命令（.venv + `run build` + 无 uv 镜像加速），
-        # 靠 store._upgrade_builtin_cmds 在 load_config 时自动刷成下面这份。
-        "cmd_rev": 1,
-        # 上一版的 run 原样留在这里：闸门只在配置里的 run **恰是这一条**时才动手 ——
-        # 那说明这条命令是我们播种下去的，而不是用户自己写的。于是用户改过的启动命令
-        # 永远不会被覆盖（这是「不覆盖用户配置」那条约定的延续）。
-        "cmd_prev_run": "{venv}octop run --host 0.0.0.0 --port {port}",
-        "repo": "https://github.com/TencentCloud/Octop.git",
-        "branch": "main",
-        "port": 19106,
-        # 独立端口直连：它的仪表盘把资源与 API 地址写死成根路径
-        # （window.location.host + /api/...，前端源码 dashboard/src/api/config.ts
-        #  里的 BASE_URL 只覆盖了一部分，聊天/终端/远程桌面的 WebSocket 仍走根路径），
-        # 挂在 /p/octop/ 下面必然全部 404，只能让它独占一个对外端口。
-        "expose_port": True,
-        "desc": "腾讯开源的多用户多智能体 AI 助手（Web 控制台 / CLI / IM / 定时任务）。"
-                "仪表盘写死根路径，故以独立端口直连：点「打开」跳 NAS:19106。"
-                "首次启动要现场构建前端并装 243 个 Python 锁包，耗时约十几分钟。",
-        # 注意：这套 setup 是 POSIX shell 专有的（if/fi、test、/dev/urandom、`VAR=值 cmd`
-        # 前缀），只能在 Linux 容器里跑。在 Windows 上 procs._prepare_setup 会提前拦下并
-        # 明确告知，不会跑到一半才炸。
-        #
-        # ⚠️ 这里是**唯一**用 .uv 而不是 .venv 的应用（见下方 setup 里的说明）。
-        # 所以 setup 与 run 必须**同时**写成 .uv，任何一方写错都会导致「装好了却起不来」。
-        "setup": (
-            "set -e\n"
-            "# 每步先打一行阶段标记。这套 setup 只可能在 Linux 容器里跑（Windows 上会被\n"
-            "# procs._prepare_setup 提前拦下），失败时用户往往只能把日志贴回来 —— 有阶段\n"
-            "# 标记才能一眼定位是卡在下载、构建还是初始化，而不是只看到一句「安装失败」。\n"
-            "echo '==> 阶段 1/4：前端依赖（npm ci，1000+ 包，通常最慢）'\n"
-            "# 前端：仓库刻意不提交构建产物（src/octop/dashboard/** 在 .gitignore 里），\n"
-            "# 必须现场 npm ci + vite build；产物直接落到 src/octop/dashboard，不影响 git 状态。\n"
-            "npm --prefix dashboard ci\n"
-            "echo '==> 阶段 2/4：前端构建（vite build，antd 模块极多，要够内存）'\n"
-            # 用 build:docker 而不是 build：后者是 `tsc -b && vite build`，会跑一遍全量
-            # 类型检查（antd + monaco + mermaid 这套规模，慢且吃内存）；官方两个 Dockerfile
-            # （docker/Dockerfile 与 fnos/docker/Dockerfile）用的都是 build:docker（只 vite build）。
-            "NODE_ENV=production npm --prefix dashboard run build:docker\n"
-            # Python：按仓库 uv.lock 锁定安装（uv 本身只装一次）。
-            #
-            # ⚠️ 这套环境叫 .uv 而不是 .venv，是刻意的：Octop 是 uv 项目（仓库带 uv.lock，
-            # 243 个锁包），官方两个 Dockerfile 走的都是 uv 那条路。但面板的 {venv} 默认指
-            # .venv —— 所以这里必须**整套**改用 {venv:.uv}，包括下面 run 那一行和 init 那行。
-            # 曾经 setup 建 .uv、run 却从 .venv 起，结果是「包都装好了，一启动就
-            # .venv/bin/octop: not found」：两个占位符指向不同目录，谁也没报错。
-            "echo '==> 阶段 3/4：Python 依赖（uv sync --frozen，按 uv.lock 锁包）'\n"
-            # uv 用 pip 装一次即可。之后所有 python 操作都走 uv（官方注释明说 pip 解析
-            # octop-harness[all] 这棵依赖树会卡死）。
-            "test -x {venv:.uv}uv || { {python} -m venv .uv && {venv:.uv}python -m pip install -q -U pip uv; }\n"
-            # 镜像加速：uv.lock 里 243 个包合计约 620 MB（pymupdf 84MB / opencv 78MB /
-            # playwright 45MB / pillow 45MB…），从 NAS 直连 files.pythonhosted.org 会慢到超时。
-            # 照抄官方 fnos Dockerfile 的写法：阿里云源为主、PyPI 为兜底（新包镜像可能还没同步）。
-            "UV_DEFAULT_INDEX=https://pypi.org/simple \\\n"
-            "UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple \\\n"
-            "UV_INSECURE_HOST=mirrors.aliyun.com \\\n"
-            "{venv:.uv}uv sync --frozen --no-dev\n"
-            "# 首次初始化管理员；已有库则跳过，保证 setup 可重复执行（更新代码后会重跑）\n"
-            "if [ ! -f \"$OCTOP_HOME/octop.db\" ]; then\n"
-            "  echo '==> 阶段 4/4：初始化数据库与管理员账号'\n"
-            "  PW=\"Oc1$(od -An -N8 -tx1 /dev/urandom | tr -d ' \\n')\"\n"
-            "  {venv:.uv}octop init --yes --admin-username admin --admin-password \"$PW\"\n"
-            "  printf '\\n============================================\\n"
-            " Octop 初始账号：admin / %s\\n"
-            " （登录后请尽快改密码，退出后再也看不到）\\n"
-            "============================================\\n\\n' \"$PW\"\n"
-            "fi"
-        ),
-        # 直连访问时来源在容器外，必须监听 0.0.0.0（不能像 AIVideoStudio 那样只绑 loopback）。
-        # ⚠️ 必须用 {venv:.uv} 与上面的 setup 对齐：这是本仓库唯一不是 .venv 的应用。
-        "run": "{venv:.uv}octop run --host 0.0.0.0 --port {port}",
-        "auto_start": True,
-        "enabled": True,
-        # 数据落在面板的数据卷里：OCTOP_HOME 是 Octop 唯一认的安装根（~/.octop 的替代）。
-        # 放在 /data 下而不是应用目录里，既随卷持久化，又不会把 git 工作区弄脏。
-        "env": {"OCTOP_HOME": "/data/octop-home/.octop"},
     },
     {
         "id": "opencut",
@@ -385,7 +304,7 @@ BUILTIN_APPS: list[dict] = [
         "name": "DramaClaw",
         "repo": "https://github.com/dramaclaw/dramaclaw.git",
         "branch": "main",
-        # 直连段里当前空闲的下一个（19105/19106/19107 分别是 ai-image-studio / octop / opencut）。
+        # 直连段里当前空闲的下一个（19105 / 19106 现在分别被 ai-image-studio 与 opencut 占着）。
         # 将来启用时也只能走独立端口：SPA 是前端路由 + 大量视频上传下载 + SSE 进度，
         # 挂 /p/<id>/ 路径前缀必然出问题。
         "port": 19108,
@@ -401,5 +320,29 @@ BUILTIN_APPS: list[dict] = [
         "auto_start": False,
         "enabled": False,
         "env": {},
+    },
+]
+
+# 已下架的内置应用
+# ---------------------------------------------------------------------------
+# 从 BUILTIN_APPS 里删掉一个条目，只能保证**新装的面板**不再播种它。已经部署过的
+# config.json 里那条还在 —— 播种的契约是「只补缺、不覆盖」，反过来也不会主动删 ——
+# 结果就是列表里还挂着这张卡片，还能点启动。
+#
+# 所以下架时必须在这里再登记一份：store._drop_archived_builtins 会在 load_config 时
+# 把命中的条目从配置里移除。和 cmd_rev 闸门一样，它也得守住「不覆盖用户配置」这条
+# 约定 —— 只有配置里的 run **恰好等于我们当初播种下去的那一版**（last_runs 指纹）
+# 时才删；用户自己改过命令的条目原样留着（那说明他接过手了，删掉等于丢数据）。
+#
+# last_runs 要列全**历史上播过的每一版 run**（老配置可能停在任意一版）。
+ARCHIVED_BUILTINS: list[dict] = [
+    {
+        "id": "octop",
+        "last_runs": [
+            # cmd_rev=1（修过 venv 错配之后的版本）
+            "{venv:.uv}octop run --host 0.0.0.0 --port {port}",
+            # cmd_rev=0（更早的旧命令，老配置可能还停在这里）
+            "{venv}octop run --host 0.0.0.0 --port {port}",
+        ],
     },
 ]

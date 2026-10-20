@@ -91,14 +91,16 @@ def load_config() -> dict:
         cfg["apps"] = apps if isinstance(apps, list) else []
         removed = cfg.get("removed")
         cfg["removed"] = [str(x) for x in removed] if isinstance(removed, list) else []
-        # 先补全老条目的新字段，再播种缺失的内置应用（播种依赖归一化后的清单），
-        # 最后把内置命令升到 catalog 声明的 cmd_rev —— 我们修正过自己的内置命令时，
-        # 只有这一步能把新命令推到**已经存在**的老配置上（见 _upgrade_builtin_cmds）。
-        # 注意三步都要跑，别用 `a() or b()` 短路——前一步为真时后面就再也不会执行了。
+        # 顺序是有讲究的：先补全老条目的新字段，再播种缺失的内置应用（播种依赖归一化
+        # 后的清单），然后把内置命令升到 catalog 声明的 cmd_rev（我们修正过自己的内置
+        # 命令时，只有这一步能把新命令推到**已经存在**的老配置上），最后把已下架的内置
+        # 应用从配置里摘掉（见 _drop_archived_builtins）。
+        # 注意四步都要跑，别用 `a() or b()` 短路——前一步为真时后面就再也不会执行了。
         migrated = _normalize_existing(cfg)
         seeded = _seed_builtins(cfg)
         upgraded = _upgrade_builtin_cmds(cfg)
-        if migrated or seeded or upgraded:
+        dropped = _drop_archived_builtins(cfg)
+        if migrated or seeded or upgraded or dropped:
             save_config(cfg)
         return cfg
 
@@ -171,7 +173,7 @@ def _upgrade_builtin_cmds(cfg: dict) -> bool:
     """把内置应用的 run/setup 升级到 catalog 当前声明的 cmd_rev；返回是否发生改动。
 
     补的是「播种只补缺、不覆盖」这条契约的盲区：我们**修正自己写的内置命令**时
-    （例如修掉 Octop 的 venv 错配），老配置里那条旧命令永远优先，修复根本到不了
+    （例如修掉 setup 与 run 指向了不同虚拟环境目录这种真故障），老配置里那条旧命令永远优先，修复根本到不了
     已经部署过的环境 —— _backfill_placeholder 只在 run/setup 同时为空时才覆盖，
     非空的老条目永远走不到那条路径。
 
@@ -212,6 +214,45 @@ def _upgrade_builtin_cmds(cfg: dict) -> bool:
         changed = True
         append_event(f"{item['id']}: 内置命令已升级到 cmd_rev={want}")
     return changed
+
+
+def _drop_archived_builtins(cfg: dict) -> bool:
+    """把 catalog.ARCHIVED_BUILTINS 里登记的下架应用从配置移除；返回是否发生改动。
+
+    补的是「只补缺、不覆盖」这条契约的**另一头**：从 BUILTIN_APPS 删掉一个条目只能
+    让新装的面板不再播种它，已经部署的 config.json 里那条还挂着，照样能启动。
+    要真正下架，必须在这里把它摘掉。
+
+    同样守着「不覆盖用户配置」：只有配置里的 run **恰好等于** catalog 记下的某一版
+    播种命令（last_runs 指纹）时才删；用户改过命令的条目原样保留 —— 那说明他自己
+    接过手了，替他删掉等于丢数据。空命令的占位条目算我们的，一并摘掉。
+
+    每次动作都会在事件日志留一条，用户在「事件」里能看到是哪条被下架了。
+    """
+    archived = {a["id"]: a for a in getattr(catalog, "ARCHIVED_BUILTINS", [])}
+    if not archived:
+        return False
+    kept: list = []
+    removed: list = []
+    for item in cfg["apps"]:
+        entry = archived.get(item.get("id"))
+        if entry is None:
+            kept.append(item)
+            continue
+        known = [str(r).strip() for r in (entry.get("last_runs") or [])]
+        have = (item.get("run") or "").strip()
+        if have and have not in known:
+            # 命令对不上任何一版指纹 → 用户自己改过，保留
+            kept.append(item)
+            append_event(f"{item['id']}: 该内置应用已下架，但启动命令是自定义的，保留条目")
+            continue
+        removed.append(item["id"])
+    if not removed:
+        return False
+    cfg["apps"] = kept
+    for appid in removed:
+        append_event(f"{appid}: 内置应用已下架，条目已从配置移除")
+    return True
 
 
 def is_builtin(app_id: str) -> bool:
@@ -266,7 +307,7 @@ def normalize_app(raw: dict, settings: dict, apps: list[dict],
         "enabled": bool(raw.get("enabled", True)),
         # 独立端口直连：应用自己占一个对外端口，卡片「打开」直接跳过去，
         # 不走 /p/<id>/ 路径前缀反代。有些应用的仪表盘把资源与 API 地址写死成
-        # 根路径（例如 Octop 前端用的是 window.location.host + /api/...），
+        # 根路径（典型写法是 window.location.host + /api/...），
         # 挂在路径前缀下必然 404，只能让它独占一个端口。
         "expose_port": bool(raw.get("expose_port", False)),
         # 路径前缀 API 重写：应用前端把接口地址写成根相对（例如 AIVideoStudio 里的
@@ -274,8 +315,8 @@ def normalize_app(raw: dict, settings: dict, apps: list[dict],
         # **面板根路径**而 404。它的静态资源能靠 HTML 属性重写正常加载，所以症状很有
         # 迷惑性：页面骨架出来了、js/css 也 200，但接口全 404，界面是一片错误文案。
         # 勾上后反代会往页面注入一段同源脚本（proxy.SHIM_PATH），把运行时的 fetch/XHR
-        # 根相对请求补回前缀。只能走独立端口的应用（expose_port，例如 Octop 还有
-        # WebSocket 流量，shim 兜不住）不要勾这一项。
+        # 根相对请求补回前缀。只能走独立端口的应用（expose_port，比如还有
+        # WebSocket 流量、shim 兜不住的那些）不要勾这一项。
         "prefix_api": bool(raw.get("prefix_api", False)),
         "env": {str(k): str(v) for k, v in (raw.get("env") or {}).items()},
         # 内置命令修订版：仅供 _upgrade_builtin_cmds 判断「catalog 的命令是否比配置里的新」。
