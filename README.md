@@ -39,7 +39,8 @@ FnDepot/
 |---|---|---|
 | Agnes AI Studio | AI赋能 | 文生图 / 图生图 / 文生视频 / 图文生视频，调用 Agnes AI 免费模型 |
 | Dev Hub 应用导航台 | 系统工具 | 聚合管理自建 GitHub 应用：更新检查、启停控制、日志、统一跳转 |
-| Octop | AI赋能 | 腾讯开源的多用户多智能体 AI 助手平台（Docker 版）。**直接引用官方发布的 FPK**，本仓库不构建 |
+| Octop | AI赋能 | 腾讯开源的多用户多智能体 AI 助手平台（Docker 版，端口 8088）。**直接引用官方发布的 FPK**，本仓库不构建 |
+| Octop 本地版 | AI赋能 | 同一平台的**本地版（native，端口 8089）**：不依赖 Docker，自带 Python 3.12 运行时与 Chromium，x86 / arm64 各一枚包。同样引用官方 FPK |
 
 > Dev Hub 的面板镜像由 `.github/workflows/build-dev-hub-image.yml` 自动构建，
 > 改 `src/dev-hub/` 下的代码并推送到 `main` 即会重建镜像；
@@ -420,6 +421,11 @@ find . -type f \( -name '*.json' -o -name '*.yml' -o -name '*.sh' \) -exec sed -
 - 版本号键要跟 **FPK 内部 `manifest` 的 `version`** 一致（不要照抄上游 Release 的 tag ——
   Octop 的 `Octop-fnos-docker-1.0.2.fpk` 里写的其实是 `1.0.300`）。解包看：
   `python -c "import tarfile;print(tarfile.open('<x>.fpk').extractfile('manifest').read().decode())"`
+- 多架构（x86 + arm64 两枚包）**不是两个版本**，而是同一个版本节点下的两个架构键
+  （见 `apps/octop-native.json`：`releases["1.0.300"].packages.{x86,arm}`），
+  同时 `platform` 写 `["x86","arm"]`。
+  ⚠️ 键名以**实际产物架构**为准，别照抄包内 manifest 的 `platform` ——
+  Octop 的 x86 包里写的竟是 `all`，arm 包里才是 `arm`。
 - `sha256` / `size` 这里**只能手工填**（没有 CI 构建可回填），所以务必跑
   `python3 scripts/verify_source.py --remote` —— 它会真下载并比对，填错当场报错。
 - 校验会提示 `未找到 packages/<appid>/manifest`，这条警告是**预期的**。
