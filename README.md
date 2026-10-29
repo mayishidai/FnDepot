@@ -18,14 +18,18 @@ FnDepot/
 │   └── <appid>/                # 需要自建镜像的应用的源码（CI 构建推送 GHCR，不进 FPK）
 ├── vendored/
 │   └── <repo>/                 # 面板托管的应用（git 子仓库，只读快照，**不参与构建**）
+├── upstream/
+│   └── <name>.json             # 上游同步目标（「作者自己发 FPK、我们只转发」的应用）
 ├── assets/
 │   └── icons/<appid>.png       # 应用图标
 ├── scripts/
 │   ├── new-app.sh              # 多应用脚手架（一键生成详情 + FPK 工程 + 图标并写回索引）
 │   ├── update_release_meta.py  # 发布时回填 download_url / sha256 / size（CI 调用）
+│   ├── sync_upstream.py        # 定时同步上游已发布的 FPK（cron 调用）
 │   └── verify_source.py        # 按 FnDepot V2 规范做发布前检查（--remote 校验实链）
 └── .github/workflows/
     ├── release-fpk.yml         # 发布 CI：打 v* tag 构建/回填/校验/发 Release
+    ├── sync-upstream.yml       # 上游同步 CI：cron 每 6 小时跟着作者更新
     └── build-dev-hub-image.yml # Dev Hub 面板镜像构建（推送到 ghcr.io）
 ```
 
@@ -39,6 +43,12 @@ FnDepot/
 |---|---|---|
 | Agnes AI Studio | AI赋能 | 文生图 / 图生图 / 文生视频 / 图文生视频，调用 Agnes AI 免费模型 |
 | Dev Hub 应用导航台 | 系统工具 | 聚合管理自建 GitHub 应用：更新检查、启停控制、日志、统一跳转 |
+| 飞牛影视在线扩展 | 影音娱乐 | 给官方影视加在线搜索/播放，轻量版，每 6 小时自动跟随上游更新 |
+| 飞牛影视在线扩展（全功能版） | 影音娱乐 | 同上，额外含加固源并发解析等增强，安装包较大，同样自动跟随 |
+
+> 后两项都来自上游 `yujian0815/fnmedia-ext`，本仓库**不打包、只转发**：
+> 两枚包的 `appid` 相同（装了其一就不能再装其二），这里用 `-full` 后缀分成两个条目，
+> 列表里会看到两张同名卡片，按需要二选一。详见下方「自动跟随上游更新」。
 
 > Dev Hub 的面板镜像由 `.github/workflows/build-dev-hub-image.yml` 自动构建，
 > 改 `src/dev-hub/` 下的代码并推送到 `main` 即会重建镜像；
@@ -424,6 +434,56 @@ find . -type f \( -name '*.json' -o -name '*.yml' -o -name '*.sh' \) -exec sed -
 - 代价：上游删资产/改文件名会导致本源失效，且上游包自身的缺陷我们改不了。
 >
 > 已发布的「版本号 + 架构」FPK **不可变**（客户端做 sha256 强校验），改内容必须发新版本号。
+
+### 自动跟随上游更新
+
+有些上游发版极勤（`yujian0815/fnmedia-ext` 一天能发 3~4 个版本），人手同步根本跟不上。
+这类应用交给 `.github/workflows/sync-upstream.yml`：cron 每 6 小时跑一次
+`scripts/sync_upstream.py`，查上游有没有新 Release，有就自动下载、算 sha256/size、
+写进 `apps/<appid>.json` 并提交。
+
+要接一个新上游，加一份 `upstream/<name>.json` + 建一个 `apps/<appid>.json`
+（首版只填静态字段即可，`releases` 交给同步脚本补）：
+
+```json
+{
+  "repo": "yujian0815/fnmedia-ext",
+  "keep_versions": 10,
+  "variants": [
+    {
+      "appid": "fnmedia-ext",
+      "asset": "fnmedia-ext-{version}.fpk",
+      "arch": "all",
+      "categories": ["影音娱乐"],
+      "icon": "../assets/icons/fnmedia-ext.png",
+      "display_name": "{manifest}",
+      "changelog_from": "plain"
+    }
+  ]
+}
+```
+
+一个上游同时发多枚包时，用多个 `variants` 产出多个条目（我们就是这么把「轻量版」和
+「全功能版」分成 `fnmedia-ext` / `fnmedia-ext-full` 的）。`display_name` 里的
+`{manifest}` 会在同步时替换成包内 manifest 的值；`desc_suffix` 可给描述追加本地说明。
+
+同步脚本的几条行为约定：
+
+- **资产没传完的 Release 会跳过，等下一轮再试**。上游确实存在「`.sha256` 已上传、
+  `.fpk` 还没传完」的中间态（v0.2.22 就撞上了），写进源会让客户端点到下载不到的包。
+- **与上游同名 `.sha256` 交叉校验**，算出来的哈希对不上就跳过并报警，不收疑似传坏的包。
+- **版本键取包内 manifest 的 `version`**，不取 Release tag（两者经常不是同一个数）。
+- **裁剪到 `keep_versions`**：V2 规范单应用上限 100 个版本，上游这个发版速度几十天就撑爆。
+- **已收录的版本节点不改写**，同步只做追加与裁剪。
+- 头部元数据分两类：`display_name`/`desc`/`maintainer` 每次跟包内 manifest 刷新
+  （作者改描述能自动跟上）；`platform`/`categories`/`icon_url` 等本源自定的字段只在
+  缺失时补，不会被上游冲掉。
+
+手工触发：Actions → **Sync upstream FPK** → Run workflow，可勾 `dry_run` 只看不动。
+
+> ⚠️ GitHub 会在仓库**连续 60 天无任何活动**后自动停用 `schedule` 触发器。
+> 哪天发现不再自动更新了，先确认是不是这个原因（推个提交即可恢复）。
+> 另外 cron 只是「大约」每 6 小时，拥堵时会延迟，不是准点调度。
 
 ## 飞牛用户如何使用
 

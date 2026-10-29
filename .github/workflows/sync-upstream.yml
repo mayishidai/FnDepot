@@ -1,0 +1,75 @@
+name: Sync upstream FPK
+
+# 定时把「作者自己就在发 FPK」的应用同步进来 —— 我们不打包，只做收录与转发。
+#
+# 这类应用（如 fnmedia-ext）发版极勤，一天能发 3~4 个版本，靠人手同步根本跟不上，
+# 所以交给 cron。同步目标在 upstream/*.json 里声明：要接一个新上游，加一个配置文件
+# 加一个 apps/<appid>.json 即可，不用碰本文件。
+#
+# 与 release-fpk.yml 的分工：那个是「我们自己有 packages/<appid>/ 工程、要构建」的应用，
+# 这个是「上游已经有产物」的应用 —— 两者互斥，进了 upstream/ 就不要建 packages/。
+#
+# ⚠️ 提醒：GitHub 会在仓库连续 60 天无任何活动后自动停用 schedule 触发器。
+#    若哪天同步停了，先确认是不是这个原因（推个提交即可恢复）。
+on:
+  schedule:
+    # 每 6 小时一次。错开整点（:17）避开 Actions 整点排队高峰。
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只报告将要同步什么，不写盘'
+        type: boolean
+        default: false
+      app:
+        description: '只同步某个 appid（留空 = 全部）'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  # 同步涉及下载与写盘，并发跑会互相覆盖；排队而不是取消，避免丢掉一次同步
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Sync upstream releases
+        env:
+          # 仓库自带的 token，用来提高 GitHub API 限额（匿名 60 次/小时极易撞墙）
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ -n "${{ inputs.app }}" ]; then ARGS="$ARGS --app ${{ inputs.app }}"; fi
+          python3 scripts/sync_upstream.py $ARGS
+
+      # 只做规范校验，不加 --remote：同步脚本已经真下载过每一枚包并算过 sha256/size，
+      # 这里再下一遍等于每次白白多传几十 MB。
+      - name: Verify source against FnDepot V2 spec
+        if: ${{ !inputs.dry_run }}
+        run: python3 scripts/verify_source.py
+
+      - name: Commit & push if changed
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps fnpack.json
+          if git diff --cached --quiet; then
+            echo "无上游更新"
+          else
+            git commit -m "chore(sync): 同步上游应用更新"
+            git push origin HEAD:main
+          fi

@@ -1,0 +1,130 @@
+{
+  "app_name": "fnmedia-ext",
+  "display_name": "飞牛影视在线扩展",
+  "desc": "飞牛影视第三方在线资源扩展：零侵入可逆接管官方影视入口，支持原生搜索聚合、豆瓣热门榜单四库与资源站海量分类四库（电影/剧集/动漫/综艺，无限滚动、点开即播）、m3u8/mp4 代理播放、多线路切换、噪音过滤、播放记录与智能续播，内置应用内管理页。",
+  "platform": [
+    "all"
+  ],
+  "categories": [
+    "影音娱乐"
+  ],
+  "icon_url": "../assets/icons/fnmedia-ext.png",
+  "maintainer": "yujian0815",
+  "maintainer_url": "https://github.com/yujian0815/fnmedia-ext",
+  "distributor": "mayishidai",
+  "run_as": "package",
+  "install_type": "",
+  "is_docker": false,
+  "releases": {
+    "0.2.21": {
+      "changelog": "内部资源加载改进。",
+      "updated_at": "2026-10-29T09:53:58+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.21/fnmedia-ext-0.2.21.fpk",
+          "sha256": "2b2533ba87804e533e547828ec0e928fcef5196ccab49819ee0db53313d16700",
+          "size": 867310
+        }
+      }
+    },
+    "0.2.22": {
+      "changelog": "内部播放解析提效（轻量版无可见变化）。",
+      "updated_at": "2026-10-29T11:06:17+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.22/fnmedia-ext-0.2.22.fpk",
+          "sha256": "acb2eb5346094c700c8227810c047e8ff24d23b3565ad625948f272e4755908c",
+          "size": 867486
+        }
+      }
+    },
+    "0.2.20": {
+      "changelog": "内部资源加载改进（轻量版无可见变化）。",
+      "updated_at": "2026-10-29T09:42:39+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.20/fnmedia-ext-0.2.20.fpk",
+          "sha256": "b90487cc65a3d200139afd0c7995200c46ca3077b5da8b7d76983066da21090e",
+          "size": 867193
+        }
+      }
+    },
+    "0.2.19": {
+      "changelog": "内部资源加载与启动体验改进（轻量版无可见变化）。",
+      "updated_at": "2026-10-28T22:24:57+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.19/fnmedia-ext-0.2.19.fpk",
+          "sha256": "7423001c25d5405b6f722d43ec880c5bf7b52e5bf14e59195d121c81fa6daf27",
+          "size": 867083
+        }
+      }
+    },
+    "0.2.18": {
+      "changelog": "内部播放解析改进（轻量版无可见变化）。",
+      "updated_at": "2026-10-28T21:33:45+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.18/fnmedia-ext-0.2.18.fpk",
+          "sha256": "1a117dd21f3ef749eb4b9735d9d2363bbb67d724b73d79044d1d030f5cea71d1",
+          "size": 866936
+        }
+      }
+    },
+    "0.2.17": {
+      "changelog": "内部资源收录与预加载改进（轻量版无可见变化）。",
+      "updated_at": "2026-10-27T15:41:27+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.17/fnmedia-ext-0.2.17.fpk",
+          "sha256": "770c68378998df5ffb9b334d81585cd727921ea6f8e79fb0e0f3353097cda9cf",
+          "size": 866759
+        }
+      }
+    },
+    "0.2.16": {
+      "changelog": "内部兼容性修复（轻量版无可见变化）。",
+      "updated_at": "2026-10-27T14:14:25+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.16/fnmedia-ext-0.2.16.fpk",
+          "sha256": "563d94d94893bc99749e6c0febbb537478e2bc0272aa339bd4806c55e2311b64",
+          "size": 866474
+        }
+      }
+    },
+    "0.2.15": {
+      "changelog": "内部浏览结构调整（轻量版无可见变化）。",
+      "updated_at": "2026-10-27T13:34:35+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.15/fnmedia-ext-0.2.15.fpk",
+          "sha256": "8b8dd09fef49c1d609a98285c7453b1449c2e3ada54519733196d8e481f859a7",
+          "size": 866383
+        }
+      }
+    },
+    "0.2.14": {
+      "changelog": "内部修复（轻量版无可见变化）。",
+      "updated_at": "2026-10-27T10:41:13+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.14/fnmedia-ext-0.2.14.fpk",
+          "sha256": "fe434a2019c9a27adafd7dd67ded82218532d6404f893d236754446350361032",
+          "size": 866183
+        }
+      }
+    },
+    "0.2.13": {
+      "changelog": "内部功能更新（轻量版无可见变化）。",
+      "updated_at": "2026-10-25T20:44:28+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.13/fnmedia-ext-0.2.13.fpk",
+          "sha256": "165d8818f3dbae220a2942cc5fb7d9296383995763b2309419dece05027e90b0",
+          "size": 866093
+        }
+      }
+    }
+  }
+}

@@ -14,6 +14,14 @@
     "dev-hub": {
       "details_url": "apps/dev-hub.json",
       "details_updated_at": "2026-10-09T20:10:00+08:00"
+    },
+    "fnmedia-ext": {
+      "details_url": "apps/fnmedia-ext.json",
+      "details_updated_at": "2026-10-29T11:18:53+08:00"
+    },
+    "fnmedia-ext-full": {
+      "details_url": "apps/fnmedia-ext-full.json",
+      "details_updated_at": "2026-10-29T11:19:21+08:00"
     }
   }
 }
