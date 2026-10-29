@@ -115,14 +115,14 @@
         }
       }
     },
-    "0.2.12": {
-      "changelog": "全功能版：修复原生「🛡加固影视」库筛选面板里看不到自定义“源 / 分类”标签的问题（飞牛筛选标签的中文名取自全局类型/地区字典，需同步注入），现在“类型”行可按各源分类、“地区”行可按源筛选。",
-      "updated_at": "2026-10-25T19:52:59+08:00",
+    "0.2.22": {
+      "changelog": "全功能版：片单型加固源的播放聚合从单实例串行改为多安卓运行时并发池——可一键起多个互相独立的加固运行时，调用按“空闲且最快”分发、设备间真并发并带健康检查与故障转移；点片时在主力资源站并发竞速取首个可解析地址，冷片名约 3~4.5 秒、同剧切集约 1 秒。附多实例一键部署脚本。",
+      "updated_at": "2026-10-29T11:06:17+08:00",
       "packages": {
         "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.12/fnmedia-ext-0.2.12-full.fpk",
-          "sha256": "4474f5f8c7971ab1647bd0fa66d707f72dea56598b6ef052b40a2631e0375720",
-          "size": 6202203
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.22/fnmedia-ext-0.2.22-full.fpk",
+          "sha256": "dafd8f29fd6e712d1a6505dda4569dfd04cf2e28c3ff128cf6b25b6a6e00b472",
+          "size": 6227191
         }
       }
     }
