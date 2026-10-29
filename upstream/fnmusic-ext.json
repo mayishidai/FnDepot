@@ -1,0 +1,21 @@
+{
+  "repo": "javycoder/fnos_music_ext",
+  "keep_versions": 5,
+  "homepage": "https://github.com/javycoder/fnos_music_ext",
+  "variants": [
+    {
+      "appid": "fnmusic-ext",
+      "asset_suffix": ".fpk",
+      "arch": "all",
+      "categories": [
+        "影音娱乐"
+      ],
+      "icon": "../assets/icons/fnmusic-ext.png",
+      "display_name": "{manifest}",
+      "desc_suffix": "",
+      "changelog_from": "plain",
+      "run_as": "root",
+      "is_docker": false
+    }
+  ]
+}

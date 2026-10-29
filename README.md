@@ -46,6 +46,7 @@ FnDepot/
 | 飞牛影视在线扩展 | 影音娱乐 | 给官方影视加在线搜索/播放，轻量版，每 6 小时自动跟随上游更新 |
 | 飞牛影视在线扩展（全功能版） | 影音娱乐 | 同上，额外含加固源并发解析等增强，安装包较大，同样自动跟随 |
 | iPTV 直播源管理 | 影音娱乐 | 自托管 IPTV：800+ 频道聚合、EPG 节目单、可视化后台，跑官方 Docker 镜像 |
+| fnMusic 音源扩展 | 影音娱乐 | 给官方音乐加在线音源（musicdl/网易云/洛雪），引用上游 FPK，每 6 小时自动跟随 |
 
 > 中间两项都来自上游 `yujian0815/fnmedia-ext`，本仓库**不打包、只转发**：
 > 两枚包的 `appid` 相同（装了其一就不能再装其二），这里用 `-full` 后缀分成两个条目，
@@ -71,6 +72,26 @@ FnDepot/
 
 **结论**：技术上是「可逆、克制」的实现，不是恶意软件；但它是 root 的中间人 + 聚合盗版源的工具。
 要不要装取决于你对上游 `yujian0815` 的信任程度和当地法律环境。不确定就别装，或装了也别导入第三方源。
+
+### fnmusic-ext 的审查结论（对比参照）
+
+同样解包审计过。**工程质量与安全性明显好于 fnmedia-ext**：
+
+| 项 | fnmusic-ext | fnmedia-ext |
+|---|---|---|
+| `verify=False`（关 TLS 校验） | **0 处** | 10 处 |
+| `eval` / `exec` / `os.system` / `curl\|bash` | **0 处** | 有 subprocess 与网络自更新 |
+| 预置大产物的完整性 | **有 sha256 锁定且实测一致**（26MB 的 lx-music-sync-server 与 native 包） | 无 |
+| 安全边界声明 | **有 `SECURITY.md`**：不改 nginx、不改官方二进制、不写官方 `music.db`、失败必须能回退 | 无 |
+| `cmd/` 脚本权限 | **0755** | 644 |
+
+仍然存在的风险（同类应用绕不开）：`run-as: root` + 装 systemd unit + 接管官方音乐
+`/var/run/trim_music.socket`（官方音乐流量过它）；`config/resource` 申请了
+**`trim.file.userAccess`（用户文件访问）**；安装需要 Docker（它会起一个音源容器）；
+网易云音源要**扫码登录**（账号凭据交给本地服务）；洛雪音源属第三方源。
+
+另外：上游 `v2.11.0d` 被作者标记为 **Pre-release**，本源按「只收正式版」的默认策略没有收录
+（当前最新正式版 2.10.2）。想要跟进预发布版的话可以打开配置的 `include_prerelease`。
 
 > Dev Hub 的面板镜像由 `.github/workflows/build-dev-hub-image.yml` 自动构建，
 > 改 `src/dev-hub/` 下的代码并推送到 `main` 即会重建镜像；

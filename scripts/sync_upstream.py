@@ -165,8 +165,20 @@ def split_changelog(body: str, kind: str) -> str:
 def resolve_asset(rel: dict, var: dict):
     """定位本次要收录的资产；返回 (资产名, 下载URL, 上游声明的sha256或None, 跳过原因)。"""
     ver_guess = rel["tag_name"].lstrip("v")
-    name = var["asset"].format(version=ver_guess)
     assets = {a["name"]: a for a in rel.get("assets", [])}
+
+    # 有些上游的资产名与 Release tag 对不上（fnmusic-ext 的 v2.11.0d 发的却是
+    # fnmusic-ext-2.11.0-3.fpk），硬拼模板必然找不到。这时改用后缀挑：
+    # 取该 Release 里第一个以 asset_suffix 结尾、且本身不是 .sha256 的资产。
+    suffix = var.get("asset_suffix")
+    if suffix:
+        cands = sorted(n for n in assets
+                       if n.endswith(suffix) and not n.endswith(".sha256"))
+        if not cands:
+            return None, None, None, f"{rel['tag_name']}: 没有以 {suffix} 结尾的资产（跳过，下轮再试）"
+        name = cands[0]
+    else:
+        name = var["asset"].format(version=ver_guess)
 
     # 坑 1：Release 可能只传了一半 —— .sha256 在了、.fpk 还没传完
     if name not in assets:
@@ -318,13 +330,24 @@ def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool) -> dict:
 
 # ------------------------------------------------------------------ 主流程
 
-def load_releases(repo: str, dry_run: bool) -> list:
+def load_releases(repo: str, cfg: dict) -> list:
     """拉取上游 Release 列表，按版本号从新到旧排序。"""
     data = json.loads(api_get(f"{API}/repos/{repo}/releases?per_page=100"))
     if not isinstance(data, list):
         raise RuntimeError(f"拉取 {repo} 的 Release 失败：{(data or {}).get('message')}")
-    # 只取正式发布（draft / prerelease 不发，避免把半成品收进源）
-    data = [r for r in data if not r.get("draft") and not r.get("prerelease")]
+
+    # 默认只收正式版：draft 一定不发；prerelease 默认也跳过，避免把半成品收进源。
+    # 有些上游把「修了正式版 bug 的准正式版」也打成 prerelease（fnmusic 的 v2.11.0d 就是），
+    # 这种要跟进的话在配置里开 include_prerelease。
+    include_pre = bool(cfg.get("include_prerelease", False))
+    kept = []
+    for r in data:
+        if r.get("draft"):
+            continue
+        if r.get("prerelease") and not include_pre:
+            continue
+        kept.append(r)
+    data = kept
     data.sort(key=lambda r: vkey(r["tag_name"].lstrip("v")), reverse=True)
     return data
 
@@ -351,7 +374,7 @@ def sync_config(path: Path, dry_run: bool, only_app: str | None) -> int:
 
     log(f"\n=== {path.name} · {repo} · 保留最近 {keep} 版 ===")
     try:
-        rel_order = load_releases(repo, dry_run)
+        rel_order = load_releases(repo, cfg)
     except Exception as exc:  # noqa: BLE001
         log(f"  ✗ {exc}")
         return 1

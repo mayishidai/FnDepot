@@ -1,0 +1,75 @@
+{
+  "app_name": "fnmusic-ext",
+  "display_name": "fnMusic 音源扩展",
+  "desc": "飞牛音乐第三方音源扩展：零侵入接管官方音乐入口，提供 musicdl 聚合、网易云、洛雪自定义源在线搜索播放，内置管理页（音源切换/扫码登录/平台选择/边听边存）。",
+  "platform": [
+    "all"
+  ],
+  "categories": [
+    "影音娱乐"
+  ],
+  "icon_url": "../assets/icons/fnmusic-ext.png",
+  "maintainer": "javycoder",
+  "maintainer_url": "https://github.com/javycoder/fnos_music_ext",
+  "distributor": "mayishidai",
+  "run_as": "root",
+  "install_type": "",
+  "is_docker": false,
+  "releases": {
+    "2.10.2": {
+      "changelog": "基线：相对 2.10.1 的变更。 - 修复 2.10.1 应用中心安装/更新时容器内 WebUI 缺少 `llm_usage` 模块导致健康检查超时、安装回滚的问题（#84、#85）：`.dockerignore` 与镜像构建补齐该模块，并新增静态校验（app.py 引用的 `proxy.*` 模块必须进镜像）与容器 `:8774/healthz` 冒烟测试，防止同类缺模块问题再次流出。 - 修复 Docker 模式下管理页 LLM 用量始终为空的问题（#85）：容器内 WebUI 现通过 `WEBUI_REPO_DIR` 定位宿主仓库中的 `llm_usage.json`（原先落到容器内 `/srv/` 读不到），且账本文件改为 0644（原先在 `UMask=0077` 下为 0600，容器内非 root 用户无法读取）。 - CI：Gitee 镜像附件上传单次限时按体积分级，修复 28MB fpk 上传必然超时；回填 moo 商店协议源索引至 2.10.1。",
+      "updated_at": "2026-10-23T20:31:02+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.10.2/fnmusic-ext-2.10.2.fpk",
+          "sha256": "af837b8cfad47bb696354689c722b422e0da852faa02915faa68c87387af9ca7",
+          "size": 27981205
+        }
+      }
+    },
+    "2.10.1": {
+      "changelog": "基线：自 2.9.0 以来的全部变更收拢（2.10.0 内容概括见下）+ 本次大模型推荐修复（#83）。 - 大模型推荐支持选择 Chat Completions（`/chat/completions`，默认）与 Responses（`/responses`）两种接口协议，均已完整实现并覆盖测试，可用于大模型推理产出歌单（每日推荐与猜你喜欢）。 - 新增每日大模型 token 用量上限（默认 100 万，0=不限制）：达到后当天不再调用、次日自动重置；当日用量与最近失败原因在管理页「高级 · 大模型」及 `/_ext/healthz` 可见。 - 新增「单次输出上限 token」（256–131072，默认 8192）与「附加请求参数」（JSON 对象）配置，均热重载生效。 - （2.10.0 概括）按账户本地“猜你喜欢”、在线优先播放已验证本地文件、公共歌单搜索、管理员垃圾清理 Beta、管理页设置页与深浅色主题。 - 修复 DeepSeek 等推理模型把输出预算耗尽后正文为空、每日推荐静默退回本地且无任何提示的问题（#83）：输出上限不再硬编码 4096，正文为空/截断/解析失败/",
+      "updated_at": "2026-10-22T22:04:27+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.10.1/fnmusic-ext-2.10.1.fpk",
+          "sha256": "a1488bb3e2d5df778b23a6d06da6140e7789a40c721b2e2b2df1b3011a28040d",
+          "size": 27980094
+        }
+      }
+    },
+    "2.10.0": {
+      "changelog": "自 2.9.0 以来的全部变更收拢为本次正式版发布（涵盖 2.10.0a–2.10.0e 迭代预发布与期间的多轮 issue 修复；各预发布版本不再单独列段）。 - 按账户生成本地“猜你喜欢”，支持数量、刷新间隔及大模型候选筛选；大模型可分别用于每日推荐与“猜你喜欢”。 - 在线歌曲优先播放已验证的本地文件；管理页新增设置页与跟随桌面的深浅色主题。 - 公共歌单支持关键词搜索、连续加载及已选名称展示，修复切换条件与分页竞态。 - 新增管理员垃圾清理 Beta，保护曲库、用户数据与活动缓存；兼容 WAL 曲库快照，清理过期日志并显示回收空间。 - 修复关闭“边听边存”时收藏在线歌曲只落试听缓存、不转存曲库导致官方绑定超时（#82）；播放中收藏、播完再收藏与列表自愈均先转存曲库再绑定。 - 修复搜索超时后无法恢复、重复搜索复用旧任务；移除搜索前逐曲探活。 - 修复洛雪服务掉线恢复、有效源误停及手机首次播放不稳定，优化共享取链与预热。 - 修复收藏红心同步、绑定本地后红心丢失及本地/在线切换的播放进度。 - 完整可播的无损文件保留原格式，中途解码失败仍降级；修复补下载重试。 - 修复歌单封面",
+      "updated_at": "2026-10-21T20:24:24+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.10.0/fnmusic-ext-2.10.0.fpk",
+          "sha256": "80541078b57181962888eb5d437d90c1b36051fdfdff8a9b4688fa5136064ead",
+          "size": 27972035
+        }
+      }
+    },
+    "2.9.0": {
+      "changelog": "自 2.8.3 以来的全部变更收拢为本次正式版发布（涵盖 2.9.0a、2.9.0b 迭代预发布与期间的多轮 issue 修复；2.9.0 开发段与两个预发布版本不再单独列段）。 - **网易云歌单常驻（issue #38）**：管理台「音乐源 → 网易账号歌单」卡片新增「网易云歌单常驻」开关。勾选并保存后，即使把音乐源切换到 musicdl/洛雪，网易账号自建歌单仍显示在音乐页、其曲目可正常播放，musicbox 进程保持常驻运行为其供数（生效前提是已扫码登录——未登录时保存会明确告警且不空跑进程，确认未登录后 5 分钟内不反复拉起）；取消勾选并保存后，若当前音源不是网易盒子则自动关闭其进程释放内存（cookie 保留在数据卷，切回不丢登录态）。配套：切源保留/回收 musicbox 进程、预览到期进程在常驻生效时转常驻保活、容器/原生重启后 entrypoint 按 cookie 启发自愈拉起 + WebUI 开机对账权威校验、健康检查只对常驻 musicbox 捕捉崩溃循环（FATAL/BACKOFF，WebUI 主动回收不算失败）、`/api/status` 对常驻 music",
+      "updated_at": "2026-10-15T21:15:41+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.9.0/fnmusic-ext-2.9.0.fpk",
+          "sha256": "861748417de611ec723f1c5dbfa7ab10d6c150ef9843db191944909ce493bd25",
+          "size": 27257554
+        }
+      }
+    },
+    "2.8.3": {
+      "changelog": "- **热门推荐榜单曲目大量播放失败，搜索后同曲却可播（issue #49）**：洛雪榜单曲目能否解析直链取决于 lxmusic 侧的 songInfo 反查缓存（真实歌名/歌手），而它只在内存——推荐歌单按天落盘，服务重启（升级/容器重启/NAS 重启）后当日歌单仍在，songInfo 却全部丢失，点播只能按 track_id 合成「未知曲目/未知歌手」兜底；ID 型源脚本（按 hash/rid 取链）不受影响，**关键词型源脚本（按歌名歌手搜上游）必然解析失败**——正是「榜单很多歌播不了、搜索后能播、第二天又能播」的完整成因（跨天歌单重建会重拉榜单回填缓存，与缓存冷热完全吻合）。三层根治：① lxmusic 新增 songInfo 磁盘持久化存储（`<LX_DATA_DIR>/songinfo_store.json`，榜单/搜索写入脏标记 + 2s 合并落盘、启动加载、tmp+rename 原子写、损坏自愈、容量与内存缓存同限同淘汰），重启后反查缓存不丢；② 代理端所有批量下发在线曲目的出口（热门/每日推荐歌单、网易账号歌单、官方歌单在线附加条目、收藏、播放历史）把 guid→真",
+      "updated_at": "2026-10-11T20:56:57+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.8.3/fnmusic-ext-2.8.3.fpk",
+          "sha256": "32f8758fb7952131ef226050a4f4f644333f07e54e0dbc43a7088565d6310a49",
+          "size": 27181026
+        }
+      }
+    }
+  }
+}
