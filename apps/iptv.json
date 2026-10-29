@@ -27,6 +27,17 @@
           "size": 479297
         }
       }
+    },
+    "1.3.0": {
+      "changelog": "发布 1.3.0。",
+      "updated_at": "2026-10-29T14:55:27+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/mayishidai/FnDepot/releases/download/v1.3.0/iptv.fpk",
+          "sha256": "1788c5d63fbf36a490914e400ce1eb11050cd64af3ed8dab2b54d36c662cf9d7",
+          "size": 480320
+        }
+      }
     }
   }
 }
