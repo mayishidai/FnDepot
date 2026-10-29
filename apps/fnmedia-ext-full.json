@@ -82,17 +82,6 @@
         }
       }
     },
-    "0.2.15": {
-      "changelog": "全功能版：原生「🛡加固影视」改为 OK影视 式目录树——打开先看到「🔥热门聚合」和各资源站文件夹，进站内再选电影/电视剧/综艺/动漫/短剧等分类，进入分类后是整页海报并可无限下拉翻页，可看资源入口大幅增多；顶部「源/分类/地区」筛选仍可用。",
-      "updated_at": "2026-10-27T13:34:35+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.15/fnmedia-ext-0.2.15-full.fpk",
-          "sha256": "26c5e9fe76019aadc191b442e345cf600cf1bae39d2be4658eafc7138f545c0f",
-          "size": 6209673
-        }
-      }
-    },
     "0.2.22": {
       "changelog": "全功能版：片单型加固源的播放聚合从单实例串行改为多安卓运行时并发池——可一键起多个互相独立的加固运行时，调用按“空闲且最快”分发、设备间真并发并带健康检查与故障转移；点片时在主力资源站并发竞速取首个可解析地址，冷片名约 3~4.5 秒、同剧切集约 1 秒。附多实例一键部署脚本。",
       "updated_at": "2026-10-29T11:06:17+08:00",
@@ -123,6 +112,17 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.23/fnmedia-ext-0.2.23-full.fpk",
           "sha256": "db1e339f66d598a01ba8049f40b741779bb2c2ed5dc3d1e76f0d1fda99321866",
           "size": 6307135
+        }
+      }
+    },
+    "0.2.25": {
+      "changelog": "全功能版：在线管理页新增「网盘」配置入口；网盘资源识别从夸克扩展到 UC / 阿里云盘 / 百度网盘 / 迅雷云盘 / 115 / 天翼 / 移动云盘及“四盘”聚合中转，点到暂未适配的网盘会给出明确提示而不是无效报错。",
+      "updated_at": "2026-10-30T00:25:08+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.25/fnmedia-ext-0.2.25-full.fpk",
+          "sha256": "34d2a9965e56bdf65417e977556b9c2fa6c24ce63555d67f2efb2c123823044b",
+          "size": 6312395
         }
       }
     }

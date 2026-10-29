@@ -93,17 +93,6 @@
         }
       }
     },
-    "0.2.15": {
-      "changelog": "内部浏览结构调整（轻量版无可见变化）。",
-      "updated_at": "2026-10-27T13:34:35+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.15/fnmedia-ext-0.2.15.fpk",
-          "sha256": "8b8dd09fef49c1d609a98285c7453b1449c2e3ada54519733196d8e481f859a7",
-          "size": 866383
-        }
-      }
-    },
     "0.2.24": {
       "changelog": "内部播放能力改进（轻量版无可见变化）。",
       "updated_at": "2026-10-29T16:54:41+08:00",
@@ -123,6 +112,17 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.23/fnmedia-ext-0.2.23.fpk",
           "sha256": "d1cbee83a555f7101be81033d5064436e60fb4eecf5480b84d2ab4b48f40b2d6",
           "size": 867793
+        }
+      }
+    },
+    "0.2.25": {
+      "changelog": "界面与识别改进（轻量版无可见变化）。",
+      "updated_at": "2026-10-30T00:25:08+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.25/fnmedia-ext-0.2.25.fpk",
+          "sha256": "179aa26fe1ed29ddd3ffa79f72e1b8b653b87e5cae7c3a3fef07997f753df10e",
+          "size": 868080
         }
       }
     }
