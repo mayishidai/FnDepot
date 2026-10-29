@@ -1,0 +1,28 @@
+services:
+  iptv:
+    image: akiralereal/iptv:latest
+    container_name: iptv
+    # 官方明确要求：用 init 进程回收无头 Chromium 退出后的僵尸进程。
+    init: true
+    ports:
+      # {host_port} 是 fnOS 注入的宿主机端口占位符；容器内固定监听 1905，
+      # 必须与下面的 mport 逐字一致，否则容器起来了但端口不通。
+      - "{host_port}:1905"
+    environment:
+      # 必须：容器监听端口，与上面 ports 的容器侧端口对应
+      - mport=1905
+      # 必须：数据目录，与下方 volumes 的容器内路径对应
+      - mdataDir=/iptv/data
+      - TZ=Asia/Shanghai
+      # 可选：访问密码。设置后后台地址变为 http://<飞牛地址>:<端口>/<密码>/admin
+      # - mpass=
+      # 可选：画质 2=标清(480p) / 3=高清(720p) / 4=蓝光(1080p，需咪咕 VIP)
+      # - mrateType=3
+      # 可选：同时存活的无头 Chromium 数（默认 2，每个约占 200~400MB）。
+      # 内存 ≤2G 的机器建议设 1，否则多路并发会把机器拖进交换、表现为卡死。
+      # - mbrowserConcurrency=1
+    volumes:
+      # data-share 声明的挂载点：/var/apps/iptv/shares/data
+      # 频道配置、台标缓存、登录态都在这里，卸载应用不会丢。
+      - "/var/apps/iptv/shares/data:/iptv/data"
+    restart: unless-stopped

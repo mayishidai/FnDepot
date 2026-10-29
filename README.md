@@ -45,10 +45,32 @@ FnDepot/
 | Dev Hub 应用导航台 | 系统工具 | 聚合管理自建 GitHub 应用：更新检查、启停控制、日志、统一跳转 |
 | 飞牛影视在线扩展 | 影音娱乐 | 给官方影视加在线搜索/播放，轻量版，每 6 小时自动跟随上游更新 |
 | 飞牛影视在线扩展（全功能版） | 影音娱乐 | 同上，额外含加固源并发解析等增强，安装包较大，同样自动跟随 |
+| iPTV 直播源管理 | 影音娱乐 | 自托管 IPTV：800+ 频道聚合、EPG 节目单、可视化后台，跑官方 Docker 镜像 |
 
-> 后两项都来自上游 `yujian0815/fnmedia-ext`，本仓库**不打包、只转发**：
+> 中间两项都来自上游 `yujian0815/fnmedia-ext`，本仓库**不打包、只转发**：
 > 两枚包的 `appid` 相同（装了其一就不能再装其二），这里用 `-full` 后缀分成两个条目，
 > 列表里会看到两张同名卡片，按需要二选一。详见下方「自动跟随上游更新」。
+
+### ⚠️ 收录前的安全审查结论（fnmedia-ext）
+
+解包审计过两份 FPK 的全部内容，**这个应用是有实质权限的，装之前请知悉**：
+
+| 项 | 事实 |
+|---|---|
+| 运行身份 | 包内 `config/privilege` 声明 **`run-as: root`**，并在 `/etc/systemd/system/` 装 `fnmedia-ext.service` |
+| 接管方式 | 把官方影视的 `/var/run/trim_media.sock` 原子换名成自己的，官方原 socket 挪到 `trim_media_upstream.sock` → **官方影视的全部 API 流量都经过这个第三方进程** |
+| 内置资源站 | `providers.py` 内置 **10 个第三方苹果 CMS 采集站且默认 `enabled: True`**（暴风/非凡/量子/无尽/优酷/光速/如意/极速/新狼/电影天堂/360）→ 涉及**版权与合规风险**，请自行判断 |
+| TLS | 代码里 **10 处 `verify=False`**（`app.py` 1、`catalog.py` 4、`subfetch.py` 5），即部分请求不校验证书，存在被中间人的可能 |
+| 自更新 | 应用可从自己的 GitHub Release 拉 FPK 热替换升级。设计上克制（**只在管理页手动点击**才装、强制 sha256 校验、只认自己仓库），但 root 进程 + 网络更新本身是供应链风险面 |
+| 依赖安装 | 安装时联网 `pip install fastapi uvicorn httpx`，**无版本锁定、无 hash 校验** |
+| 订阅功能 | 可下载并执行第三方 **spider jar / DRPY 规则脚本**，以及 GitHub 加速代理（`ghproxy.net`/`ghfast.top`/`raw.gitmirror.com`）取源 |
+| 全功能版额外 | 多带一个 `spider-runner`：会在机器上起 **Android（redroid）容器 + jar 桥接**执行爬虫，攻击面与资源占用都更大 |
+
+做得好的地方（客观说）：接管前会**校验目标进程确实是官方 trim-media**、健康检查失败就不接管、
+用原子换名（可回滚）、停止与卸载时还原官方 socket；`config/resource` 的 `api-scope` 为空，没申请额外 API。
+
+**结论**：技术上是「可逆、克制」的实现，不是恶意软件；但它是 root 的中间人 + 聚合盗版源的工具。
+要不要装取决于你对上游 `yujian0815` 的信任程度和当地法律环境。不确定就别装，或装了也别导入第三方源。
 
 > Dev Hub 的面板镜像由 `.github/workflows/build-dev-hub-image.yml` 自动构建，
 > 改 `src/dev-hub/` 下的代码并推送到 `main` 即会重建镜像；

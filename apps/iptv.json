@@ -1,0 +1,20 @@
+{
+  "app_name": "iptv",
+  "display_name": "iPTV 直播源管理",
+  "desc": "自托管 IPTV 直播源管理与分发系统：聚合央视频、咪咕、央视、卫视、凤凰卫视、亚太、国际、地方台、体育赛事与抖音/B站/斗鱼/虎牙直播等 800+ 频道，支持自定义抓取源与订阅、EPG 节目单，自带可视化管理后台。频道与画质等配置在后台「源管理」里改，不用重启容器。",
+  "platform": [
+    "all"
+  ],
+  "categories": [
+    "影音娱乐"
+  ],
+  "icon_url": "../assets/icons/iptv.png",
+  "maintainer": "akiralereal",
+  "maintainer_url": "https://github.com/akiralereal/iptv",
+  "distributor": "mayishidai",
+  "run_as": "package",
+  "install_type": "",
+  "is_docker": true,
+  "service_port": "1905",
+  "releases": {}
+}
