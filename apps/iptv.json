@@ -16,5 +16,17 @@
   "install_type": "",
   "is_docker": true,
   "service_port": "1905",
-  "releases": {}
+  "releases": {
+    "1.2.0": {
+      "changelog": "发布 1.2.0。",
+      "updated_at": "2026-10-29T11:50:57+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/mayishidai/FnDepot/releases/download/v1.2.0/iptv.fpk",
+          "sha256": "e30e2c3a8e53252e2b1d3e4adeb54b56af4362bade6bad870b24de091d682700",
+          "size": 479297
+        }
+      }
+    }
+  }
 }

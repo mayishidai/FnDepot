@@ -26,6 +26,17 @@
           "size": 8445
         }
       }
+    },
+    "1.2.0": {
+      "changelog": "发布 1.2.0。",
+      "updated_at": "2026-10-29T11:50:58+08:00",
+      "packages": {
+        "x86": {
+          "download_url": "https://github.com/mayishidai/FnDepot/releases/download/v1.2.0/dev-hub.fpk",
+          "sha256": "d4c0f21a879f26687f1e0e7b6860330d2aaaca4bca0de49f4c96000833e6c1d7",
+          "size": 8661
+        }
+      }
     }
   }
 }

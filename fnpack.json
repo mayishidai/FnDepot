@@ -22,6 +22,10 @@
     "fnmedia-ext-full": {
       "details_url": "apps/fnmedia-ext-full.json",
       "details_updated_at": "2026-10-29T11:19:21+08:00"
+    },
+    "iptv": {
+      "details_url": "apps/iptv.json",
+      "details_updated_at": "2026-10-29T11:50:57+08:00"
     }
   }
 }
