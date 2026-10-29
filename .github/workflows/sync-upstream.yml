@@ -62,6 +62,7 @@ jobs:
         run: python3 scripts/verify_source.py
 
       - name: Commit & push if changed
+        id: commit
         if: ${{ !inputs.dry_run }}
         run: |
           git config user.name "github-actions[bot]"
@@ -69,7 +70,25 @@ jobs:
           git add apps fnpack.json
           if git diff --cached --quiet; then
             echo "无上游更新"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore(sync): 同步上游应用更新"
             git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # 只在真的收进了新版本时才扫：上游一天能发好几版，每 6 小时全量重扫一遍
+      # 等于白下载几十 MB。规则变更后的全量复查交给 risk-audit.yml（每周一次）。
+      - name: Risk audit on newly synced versions
+        if: ${{ !inputs.dry_run && steps.commit.outputs.changed == 'true' }}
+        continue-on-error: true
+        run: |
+          python3 scripts/audit_risk.py > risk-report.txt 2>&1 || true
+
+      - name: Upload risk report
+        if: ${{ !inputs.dry_run && steps.commit.outputs.changed == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-report-sync
+          path: risk-report.txt
+          if-no-files-found: ignore

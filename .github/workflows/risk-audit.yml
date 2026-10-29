@@ -1,0 +1,99 @@
+name: Risk audit
+
+# 收录前 / 同步后的风险扫描。检查的是「对飞牛系统的影响」「后门」「漏洞」三类，
+# 不管合规与版权。规则与判定标准见 docs/RISK.md。
+#
+# 这个 workflow **不会替人下结论**，只把事实摆出来：扫描结果写成报告上传，
+# 结论（放行 / 拒绝 / 放行但登记例外）永远由维护者拍板。
+# 因此扫描步骤一律 continue-on-error —— 有高危项不该让 CI 变红，而该让人去看报告。
+#
+# 三条触发路径：
+#   · 改了 packages/ apps/ upstream/ 或规则本身 —— 新应用接入与规则变更要重新过一遍
+#   · 每周一全量复查 —— 上游新版本可能带来新风险，光靠「有新版本时扫」会漏掉规则更新
+#   · 手工触发
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'apps/**'
+      - 'upstream/**'
+      - 'scripts/audit_risk.py'
+      - '.github/workflows/risk-audit.yml'
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'apps/**'
+      - 'upstream/**'
+      - 'scripts/audit_risk.py'
+  schedule:
+    # 每周一 03:23（错开整点，避开 Actions 排队高峰）
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: risk-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run risk audit
+        # 退出码非 0 只代表「有 HIGH/CRITICAL」，不代表流程失败
+        continue-on-error: true
+        run: |
+          python3 scripts/audit_risk.py --json > risk-report.json || true
+          python3 scripts/audit_risk.py > risk-report.txt || true
+
+      - name: Write summary
+        # 刻意写成「先落脚本文件再执行」而不是 `python3 - <<'PY'`：
+        # 从 stdin 喂的 heredoc 在部分非交互 shell 下会静默卡死。
+        run: |
+          cat > /tmp/risk_summary.py <<'PY'
+          import json
+          try:
+              data = json.load(open("risk-report.json", encoding="utf-8"))
+          except Exception as exc:
+              print(f"## 风险扫描\n\n报告解析失败：{exc}")
+              raise SystemExit
+          print("## 风险扫描结论\n")
+          print("| 目标 | 运行身份 | 隔离 | 结论 | 理由 |")
+          print("|---|---|---|---|---|")
+          for r in data:
+              m = r["meta"]
+              iso = "Docker" if m.get("docker") else "**无**"
+              who = m.get("run_as") or "未声明"
+              if who == "root":
+                  who = "**root**"
+              print(f"| {r['target']} | {who} | {iso} | {r['verdict']} | {r['reason']} |")
+          print()
+          for r in data:
+              if r["verdict"] == "建议放行":
+                  continue
+              print(f"### {r['target']}\n")
+              for f in sorted(r["findings"], key=lambda x: ["CRITICAL","HIGH","MEDIUM","LOW","INFO"].index(x["severity"]))[:12]:
+                  print(f"- **{f['severity']}** `{f['code']}` {f['hint']} —— `{f['file']}:{f['line']}`")
+              print()
+          PY
+          python3 /tmp/risk_summary.py >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-report
+          path: |
+            risk-report.json
+            risk-report.txt
+          if-no-files-found: ignore

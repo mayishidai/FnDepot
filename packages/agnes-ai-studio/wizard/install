@@ -1,0 +1,22 @@
+[
+  {
+    "stepTitle": "权限与影响确认",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "安装前请确认本应用会用到的权限、以及对系统造成的影响：\n\n【运行环境】在独立的 Docker 容器内运行，以非 root 的专用用户（docker-agnes-ai-studio）启动。不使用特权模式、不共享宿主机 PID/网络命名空间、不挂载 docker.sock。\n\n【占用的端口】1 个（由应用中心分配），对应容器内 5000。\n\n【读写的数据】仅读写自己的 4 个数据卷：config（配置）、videos（生成的视频）、pictures（生成的图片）、dramas（生成的短剧）。卸载应用不会删除这些目录。\n\n【网络行为】调用 Agnes AI 的在线接口生成图片与视频，需要你自备 API Key 并在设置页填写；Key 保存在本应用自己的配置里。\n\n【不会做的事】不改系统配置、不装 systemd 服务、不接管或替换飞牛官方任何服务、不申请任何飞牛系统 API 权限。\n\n只有勾选下方「我已阅读并同意」，才能继续安装。"
+      },
+      {
+        "type": "checkbox",
+        "field": "wizard_agree_perms",
+        "label": "我已阅读并同意上述权限与影响说明",
+        "options": [
+          { "label": "我已阅读并同意", "value": "agree" }
+        ],
+        "rules": [
+          { "required": true, "message": "请先勾选同意权限说明后再安装" }
+        ]
+      }
+    ]
+  }
+]

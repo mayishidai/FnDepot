@@ -1,7 +1,7 @@
 {
   "app_name": "agnes-ai-studio",
   "display_name": "Agnes AI Studio",
-  "desc": "通过 Web UI 实现文生图、图生图、文生视频、图文生视频，调用 Agnes AI 免费图像/视频生成模型。需自备 Agnes AI API Key（在设置页填写）。",
+  "desc": "通过 Web UI 实现文生图、图生图、文生视频、图文生视频，调用 Agnes AI 免费图像/视频生成模型。需自备 Agnes AI API Key（在设置页填写）。\n【权限与影响】\n· 运行环境：Docker 容器隔离，以非 root 专用用户（docker-agnes-ai-studio）运行；无特权模式、不挂 docker.sock\n· 系统改动：无 —— 不装 systemd 服务、不改系统配置、不接管或替换飞牛官方服务\n· 飞牛 API：未申请\n· 占用端口：1 个（由应用中心分配），容器内 5000\n· 读写数据：仅自己的数据卷 config / videos / pictures / dramas\n· 网络行为：调用 Agnes AI 在线接口生成图片与视频（需自备 API Key，Key 保存在本应用配置里）\n",
   "platform": [
     "x86"
   ],

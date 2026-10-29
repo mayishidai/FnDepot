@@ -16,7 +16,8 @@
       "changelog_from": "plain",
       "run_as": "root",
       "is_docker": false,
-      "channel": "stable"
+      "channel": "stable",
+      "permission_note": "【权限与影响】\n· 运行环境：⚠ 直接运行在飞牛系统上，**无容器隔离**，以 **root** 身份\n· 系统改动：⚠ 安装并操作系统级服务 `/etc/systemd/system/fnmusic-ext.service`（开机自启）；接管官方飞牛音乐的 `/var/run/trim_music.socket`（官方音乐流量经过本应用）\n· 飞牛 API：申请了 `trim.file.userAccess`（用户文件访问）\n· 其它：安装与运行**需要 Docker**（它会另起一个音源容器），但本应用自身不跑在容器里\n· 网络行为：访问网易云 / QQ音乐 / 咪咕 / 洛雪等音源；网易云音源需扫码登录\n· ⚠ 本应用不满足「独立运行环境」要求，已由源维护者人工扫描审查后放行，详见仓库 README"
     },
     {
       "appid": "fnmusic-ext-preview",
@@ -34,7 +35,8 @@
       "is_docker": false,
       "channel": "prerelease",
       "keep_versions": 3,
-      "baseline_app": "fnmusic-ext"
+      "baseline_app": "fnmusic-ext",
+      "permission_note": "【权限与影响】\n· 运行环境：⚠ 直接运行在飞牛系统上，**无容器隔离**，以 **root** 身份\n· 系统改动：⚠ 安装并操作系统级服务 `/etc/systemd/system/fnmusic-ext.service`（开机自启）；接管官方飞牛音乐的 `/var/run/trim_music.socket`（官方音乐流量经过本应用）\n· 飞牛 API：申请了 `trim.file.userAccess`（用户文件访问）\n· 其它：安装与运行**需要 Docker**（它会另起一个音源容器），但本应用自身不跑在容器里\n· 网络行为：访问网易云 / QQ音乐 / 咪咕 / 洛雪等音源；网易云音源需扫码登录\n· ⚠ 本应用不满足「独立运行环境」要求，且收录的是上游**未经完整测试的预发布版**，已由源维护者人工扫描审查后放行，详见仓库 README"
     }
   ]
 }

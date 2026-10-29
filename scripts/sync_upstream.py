@@ -346,11 +346,17 @@ def prune(releases: dict, keep: int) -> list:
     return drop
 
 
-def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool) -> dict:
-    """同步一个变体（一个 appid）；返回统计。"""
+def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool,
+                 refresh: bool = False) -> dict:
+    """同步一个变体（一个 appid）；返回统计。
+
+    refresh=True 时即使没有新版本，也会重读该通道最新一版包的 manifest 来刷新头部
+    元数据 —— 改了配置里的 permission_note / desc_suffix 之类要靠它立刻生效
+    （正常同步只在「收录了新版本」时才刷新头部）。代价是要重新下载一枚包。
+    """
     appid = var["appid"]
     app_path = ROOT / "apps" / f"{appid}.json"
-    stat = {"appid": appid, "added": [], "skipped": [], "pruned": []}
+    stat = {"appid": appid, "added": [], "skipped": [], "pruned": [], "refreshed": False}
 
     if not app_path.is_file():
         stat["skipped"].append(f"缺少 apps/{appid}.json，跳过（请先手工建好详情文件）")
@@ -402,8 +408,19 @@ def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool) -> dict:
         stat["pruned"] = prune(dict(releases), keep) if len(releases) > keep else []
         return stat
 
+    if refresh and not latest_fields and rel_order and not dry_run:
+        _, _, fields = build_version(rel_order[0], var, dry_run)
+        if fields:
+            latest_fields = fields
+            stat["refreshed"] = True
+
     if latest_fields:
-        apply_header(detail, var, cfg, latest_fields, baseline_note(var, rel_order))
+        # desc 每次同步都会被包内 manifest 刷新，所以「权限段」必须由配置注入，
+        # 直接手改 apps/*.json 会被下一轮同步冲掉。
+        parts = [p for p in ((var.get("permission_note") or "").strip(),
+                             baseline_note(var, rel_order)) if p]
+        note = "\n\n" + "\n\n".join(parts) if parts else ""
+        apply_header(detail, var, cfg, latest_fields, note)
 
     stat["pruned"] = prune(releases, keep)
     write_json(app_path, detail)
@@ -454,7 +471,7 @@ def ensure_indexed(appid: str) -> bool:
     return True
 
 
-def sync_config(path: Path, dry_run: bool, only_app: str | None) -> int:
+def sync_config(path: Path, dry_run: bool, only_app: str | None, refresh: bool = False) -> int:
     cfg = read_json(path)
     repo = cfg["repo"]
     keep = int(cfg.get("keep_versions", 10))
@@ -474,7 +491,7 @@ def sync_config(path: Path, dry_run: bool, only_app: str | None) -> int:
     changed = False
     failed = False
     for var in variants:
-        stat = sync_variant(rel_order, var, cfg, dry_run)
+        stat = sync_variant(rel_order, var, cfg, dry_run, refresh)
         vkeep = int(var.get("keep_versions") or keep)
         log(f"  [{stat['appid']}] 通道={channel_of(var, cfg)} 保留={vkeep}"
             + (f" 基线={var['baseline_app']}" if var.get("baseline_app") else ""))
@@ -483,6 +500,9 @@ def sync_config(path: Path, dry_run: bool, only_app: str | None) -> int:
             changed = True
         else:
             log("    无新版本")
+        if stat.get("refreshed"):
+            log("    已刷新头部元数据（--refresh）")
+            changed = True
         for reason in stat["skipped"]:
             log(f"    跳过: {reason}")
         if stat["pruned"]:
@@ -497,6 +517,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="同步上游已发布的 FPK 到本应用源")
     ap.add_argument("--dry-run", action="store_true", help="只报告将要做什么，不写盘")
     ap.add_argument("--app", help="只同步涉及该 appid 的配置")
+    ap.add_argument("--refresh", action="store_true",
+                    help="即使没有新版本也重新读取最新包刷新头部元数据（改了权限段说明时用）")
     args = ap.parse_args()
 
     if not TOKEN:
@@ -513,7 +535,7 @@ def main() -> int:
 
     rc = 0
     for path in configs:
-        rc |= sync_config(path, args.dry_run, args.app)
+        rc |= sync_config(path, args.dry_run, args.app, args.refresh)
 
     log("-" * 70)
     log("完成。改动需提交后才会生效。")

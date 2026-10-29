@@ -14,7 +14,9 @@
       "display_name": "{manifest}",
       "desc_suffix": "",
       "changelog_from": "plain",
-      "run_as": "root"
+      "run_as": "root",
+      "channel": "stable",
+      "permission_note": "【权限与影响】\n· 运行环境：⚠ 直接运行在飞牛系统上，**无容器隔离**，以 **root** 身份\n· 系统改动：⚠ 安装并操作系统级服务 `/etc/systemd/system/fnmedia-ext.service`（开机自启）；改名接管官方飞牛影视的 `/var/run/trim_media.sock`（官方影视的全部 API 流量经过本应用）\n· 飞牛 API：未申请\n· 其它：安装时联网 `pip install` 依赖且**未锁版本、无 hash 校验**；运行时可下载执行第三方 spider jar / DRPY 规则脚本；内置 10 个第三方采集站且默认启用\n· 网络行为：代码中有 10 处关闭 TLS 证书校验（`verify=False`）\n· ⚠ 本应用不满足「独立运行环境」要求，已由源维护者人工扫描审查后放行，详见仓库 README"
     },
     {
       "appid": "fnmedia-ext-full",
@@ -27,7 +29,9 @@
       "display_name": "{manifest}（全功能版）",
       "desc_suffix": "（全功能版：额外包含加固源的安卓运行时并发解析等增强能力，安装包较大；轻量版请选「飞牛影视在线扩展」。）",
       "changelog_from": "quote",
-      "run_as": "root"
+      "run_as": "root",
+      "channel": "stable",
+      "permission_note": "【权限与影响】\n· 运行环境：⚠ 直接运行在飞牛系统上，**无容器隔离**，以 **root** 身份\n· 系统改动：⚠ 安装并操作系统级服务 `/etc/systemd/system/fnmedia-ext.service`（开机自启）；改名接管官方飞牛影视的 `/var/run/trim_media.sock`（官方影视的全部 API 流量经过本应用）\n· 飞牛 API：未申请\n· 其它：安装时联网 `pip install` 依赖且**未锁版本、无 hash 校验**；运行时可下载执行第三方 spider jar / DRPY 规则脚本；内置 10 个第三方采集站且默认启用\n· 全功能版额外：会拉起 **Android（redroid）容器 + jar 桥接**执行加固源爬虫，攻击面与资源占用都更大\n· 网络行为：代码中有 10 处关闭 TLS 证书校验（`verify=False`）\n· ⚠ 本应用不满足「独立运行环境」要求，已由源维护者人工扫描审查后放行，详见仓库 README"
     }
   ]
 }
