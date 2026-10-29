@@ -93,28 +93,6 @@
         }
       }
     },
-    "0.2.14": {
-      "changelog": "全功能版：修复原生「🛡加固影视」把电视剧识别成电影的问题（按源分类名确定整类影视类型，选集 UI 也正确）；选源/分类后支持无限翻页、片单大幅增多；并加固 redroid 桥 App 在高频调用下卡死导致库变空的自愈能力。",
-      "updated_at": "2026-10-27T10:41:13+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.14/fnmedia-ext-0.2.14-full.fpk",
-          "sha256": "026f135ec3c4b008bbef7c32f40df24fdd54823a27240ef7cc9623346b2cd583",
-          "size": 6206770
-        }
-      }
-    },
-    "0.2.13": {
-      "changelog": "全功能版：原生「🛡加固影视」库筛选条接入源自带的“地区”二级筛选——「类型」行选某源分类、「地区」行选地区（跨源归并同物异名），即可像 OK影视/TVBox 一样按地区实时过滤片单。",
-      "updated_at": "2026-10-25T20:44:28+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.13/fnmedia-ext-0.2.13-full.fpk",
-          "sha256": "ab6d50e9ebd3e1184c889c6e7d3f4c9d549f01b119491b1247ff0d460b8201e2",
-          "size": 6204352
-        }
-      }
-    },
     "0.2.22": {
       "changelog": "全功能版：片单型加固源的播放聚合从单实例串行改为多安卓运行时并发池——可一键起多个互相独立的加固运行时，调用按“空闲且最快”分发、设备间真并发并带健康检查与故障转移；点片时在主力资源站并发竞速取首个可解析地址，冷片名约 3~4.5 秒、同剧切集约 1 秒。附多实例一键部署脚本。",
       "updated_at": "2026-10-29T11:06:17+08:00",
@@ -123,6 +101,28 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.22/fnmedia-ext-0.2.22-full.fpk",
           "sha256": "dafd8f29fd6e712d1a6505dda4569dfd04cf2e28c3ff128cf6b25b6a6e00b472",
           "size": 6227191
+        }
+      }
+    },
+    "0.2.24": {
+      "changelog": "全功能版：第三方网盘（夸克）播放改用与官方 App 客户端一致的在线播放接口取原画档，原画不再受 PC 网页接口单文件约 2GB 的大小限制（实测 6.7GB 电影可原画、任意进度拖动 206）；播放地址改为点播放时按文件实时换取，避免转存后短时效签名过期。",
+      "updated_at": "2026-10-29T16:54:41+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.24/fnmedia-ext-0.2.24-full.fpk",
+          "sha256": "cb47135965c338a2484e437e60a55e292ff2d986ae2b27443d925f163ec46015",
+          "size": 6308169
+        }
+      }
+    },
+    "0.2.23": {
+      "changelog": "全功能版：新增第三方网盘分享的在线播放支持（MVP：夸克网盘），纯 HTTP 实现、不依赖加固运行时——插件内置自助登录页（扫码 / 粘贴 Cookie，凭据仅存本机），输入网盘分享链接（含提取码）自动转存到固定目录并取原画直链；播放由插件以带登录态的流式代理转发并透传 Range，支持拖动。加固源里的网盘分享型片源在播放时自动走该链路。",
+      "updated_at": "2026-10-29T15:52:13+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.23/fnmedia-ext-0.2.23-full.fpk",
+          "sha256": "db1e339f66d598a01ba8049f40b741779bb2c2ed5dc3d1e76f0d1fda99321866",
+          "size": 6307135
         }
       }
     }
