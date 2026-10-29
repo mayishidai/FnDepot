@@ -70,6 +70,61 @@
           "size": 27181026
         }
       }
+    },
+    "2.8.2": {
+      "changelog": "- **暂存曲目重播转正与出流的文件竞态（issue #52 审查发现，2.8.1 遗留）**：元数据缺失暂存 cache 的曲目重播时，后台转正任务可能在出流响应体生成器 `open()` 缓存文件之前就 `os.replace` 把文件移进曲库，极端调度顺序下当次响应体读不到文件（客户端重试可自愈）。现转正任务先让出事件循环 0.5 秒再动文件，保证 open 先行完成（fd 打开后 replace 不影响已打开句柄）；新增回归测试锁定「先让渡再动文件」顺序。",
+      "updated_at": "2026-10-11T16:07:36+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.8.2/fnmusic-ext-2.8.2.fpk",
+          "sha256": "9f954a5291421bdbcd0d31e12163812c07b66b431a87c9bb502a54a415960fdf",
+          "size": 27173488
+        }
+      }
+    },
+    "2.8.1": {
+      "changelog": "- **洛雪免登录榜单全部为空，歌单列表只剩每日推荐（issue #47）**：lxmusic 调 lxserver 榜单歌曲接口时参数名误用 `id`，而上游只认 `bangid`（缺失直接 400 \"Missing bangid\"），错误又被静默吞掉——「热门推荐」构建的 lx 榜单层永远取不到歌，lx 音源用户（尤其未登录网易时）的歌单列表不再出现热门推荐。现参数对齐上游契约，bangid 改为按榜单名从 boards 接口动态解析（进程内缓存 10 分钟，解析失败回退内置默认值，上游换榜 id 不再静默失效），非 200 响应补 warning 日志不再静默；新增 MockTransport 参数契约测试锁定该回归通道。 - **网易云在线封面在官方手机 App 不显示（issue #48，2.8.0 未修完的部分）**：封面接口此前对在线曲目一律 `302` 跳转源站 CDN 直链，官方手机 App 的封面加载器不跟随跨域重定向（网页端跟随所以正常），导致网易云（含 VIP）曲目在 App 内整屏无封面。现封面接口默认**代理同源直出图片字节**：服务端代拉源站 CDN 后连",
+      "updated_at": "2026-10-11T16:07:21+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.8.1/fnmusic-ext-2.8.1.fpk",
+          "sha256": "b0433a06c6ca4b23a5378ec1a13cf366f56c94ac2662be06ba27955346f832c6",
+          "size": 27173220
+        }
+      }
+    },
+    "2.8.0": {
+      "changelog": "自 2.7.0 以来的全部变更收拢为本次正式版发布（涵盖 2.8.0a–2.8.0l 迭代改进）。 - **原生（无 Docker）部署形态**：`./install.sh --deploy native` 后，音源四程序（musicdl / musicbox / lxmusic / WebUI）与 lxserver 由宿主机 systemd unit 内的 supervisord 按需拉起，直接监听与容器发布一致的 `127.0.0.1` 端口，功能与 Docker 形态完全一致；两种形态共用 `.env` 与数据目录、同机互斥、`--deploy` 一键互切（洛雪 `file://` 源路径自动迁移），原生升级 = `git pull` 后重跑 `extend.sh`。 - **WebUI「储存」菜单与自定义缓存/下载目录**：「边听边存」升级为「储存」父菜单，下设「边听边存」与「目录设置」两个子页；歌曲缓存目录与下载目录可分开自定义——飞牛桌面内「从 NAS 选择」（选择即完成应用授权）或直接粘贴路径，保存前按宿主真实落盘视角校验目录可写，两目录禁止相同或互为父子；缓存目录变更时",
+      "updated_at": "2026-10-11T02:56:11+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.8.0/fnmusic-ext-2.8.0.fpk",
+          "sha256": "8a30e3e293d7622823071219a57e8cac33ec91669390c36c5ad5804895397338",
+          "size": 27165647
+        }
+      }
+    },
+    "2.7.0": {
+      "changelog": "自 2.6.3 以来的全部变更收拢为本次正式版发布（涵盖 2.7.0a、2.7.0b、2.7.0c 迭代改进）。 - **洛雪音源底层全面接入官方生态实现 lxserver（搜索/解析/播放/歌词全面升级）**： 1. **洛雪桌面版原生 musicSdk 支持**：采用成熟的 XCQ0607/lxserver 服务端（内嵌洛雪桌面版官方 musicSdk 移植）替换原有自研 Python 抓取器与 Node 沙箱，完整覆盖酷我(kw)、酷狗(kg)、QQ音乐(tx)、网易云(wy)、咪咕(mg)五大平台的免登录搜索、榜单、歌词与元数据解析； 2. **支持洛雪自定义音源规范**：原生兼容 `globalThis.lx` API 全家桶及桌面版自定义源脚本（vm2 沙箱隔离 + 多源调度与自动重试）； 3. **契约保持与防护机制完善**：适配层保持 `lx:<src>:<id>` ID 格式与端点契约不变，无缝兼容老用户收藏、歌单与最近播放；继承 Range 魔数流式探活、音质阶梯降级、搜索门闸防抖与链路熔断机制； 4. **版本解耦与离线打包**：新增 `container/lxs",
+      "updated_at": "2026-10-09T00:32:38+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.7.0/fnmusic-ext-2.7.0.fpk",
+          "sha256": "f01acdede875c11f381746ee205d4108727c4be70d69e589be2319eb0e271ac9",
+          "size": 27079012
+        }
+      }
+    },
+    "2.6.3": {
+      "changelog": "- **第三方音源（墨澜/星海等）搜索超时与无结果修复（新增逐曲探活可选控制）**： 1. **搜索性能优化（毫秒级直出）**：解决第三方音源在搜索阶段因并发解析直链与网络探活导致 12s 超时（`search deadline exceeded`）以及频繁触发熔断导致全平台搜不出歌曲的问题。新增 `逐曲探活(beta)` 开关（默认关闭），关闭时搜索候选曲目跳过直链解析与 Range 探活，单次搜索耗时从 12 秒降至 30 毫秒，并在播放时按需解析真实音频流； 2. **代理层放行收费曲目**：逐曲探活关闭时，代理层对来自第三方音源的搜索候选曲目豁免 VIP/收费元数据拦截（同时严格保留试听、坏链接与无音频流等真不可播防御），使 VIP/版权曲目能够正常展示并在点播时交由用户源解析； 3. **WebUI 体验优化**：新增「搜索」独立菜单页（置于播放与推荐下方），移入搜索超时设置并提供逐曲探活开关及作用说明；清理「音乐源」页面过期的切换描述文案。 - **转码下载文件接口报 500（`UnicodeEncodeError`）**：下载曲库歌曲或透传官方转码任务时，官方后端在 `C",
+      "updated_at": "2026-09-30T16:23:46+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.6.3/fnmusic-ext-2.6.3.fpk",
+          "sha256": "104a031e5670e26bc0dcaa4ba58c90e379934bfbeec24abab2ec831c6635f045",
+          "size": 1588122
+        }
+      }
     }
   }
 }
