@@ -24,6 +24,10 @@ upstream/fnmedia-ext.json：同一个上游同时发「轻量版」与「全功�
    100 个版本，不裁剪几十天就撑爆了。
 6. **changelog 按变体拆**。上游习惯把「全功能版」的补充说明写在 `>` 引用块里，正文
    写通用说明；所以轻量版取正文、全功能版取引用块，一方为空时互相兜底。
+7. **同一上游可以再按「发布通道」拆条目**。有些作者会把未稳定的迭代版打成
+   Pre-release（fnmusic 的 v2.11.0d 就是）。这类版本不该混进正式版条目，但也不该
+   直接丢掉 —— 用 `channel: prerelease` 单独开一个「预览版」条目，并用
+   `version_suffix` 把 `-preview` 打进版本键，客户端一眼能分辨。
 
 用法:
     python3 scripts/sync_upstream.py                 # 同步 upstream/ 下所有配置
@@ -88,10 +92,17 @@ def download(url: str) -> bytes:
 
 
 def vkey(v: str):
-    """版本号排序键。数字段按数值比，非数字段按字符串比（0.2.21 < 0.2.100）。"""
+    """版本号排序键。数字段按数值比，非数字段按字符串比（0.2.21 < 0.2.100）。
+
+    预发布后缀（SEMVER 的 `-xxx`）单独摘出来，且排在「无后缀」之前：即
+    `2.11.0-3 < 2.11.0`，符合 SEMVER 语义。早期实现把 `-` 当成普通分隔符，
+    会得出 `2.11.0 < 2.11.0-3`（预发布反而更新），与规范相反。
+    """
+    core, _, pre = v.partition("-")
     out = []
-    for part in re.split(r"[.\-+]", v):
+    for part in re.split(r"[.\+]", core):
         out.append((0, int(part), "") if part.isdigit() else (1, 0, part))
+    out.append((0, 0 if pre else 1, pre))
     return out
 
 
@@ -160,6 +171,54 @@ def split_changelog(body: str, kind: str) -> str:
     return text[:MAX_CHANGELOG]
 
 
+def filter_releases(rel_order: list, mode: str) -> list:
+    """按变体的发布通道挑 Release。
+
+    stable = 只要正式版（默认，避免把半成品收进源）
+    prerelease = 只要预发布版（单独开一个「预览版」条目时用）
+    all = 都要
+    """
+    if mode == "all":
+        return rel_order
+    want_pre = mode == "prerelease"
+    return [r for r in rel_order if bool(r.get("prerelease")) == want_pre]
+
+
+def baseline_note(var: dict, rel_order: list) -> str:
+    """生成「预览版 vs 稳定版」的版本关系说明。
+
+    预览版单独成条目后，最大的问题是用户看不出它和稳定版谁更靠前、领先多少。
+    这里显式算出：稳定版条目当前最新的版本号作基线，再数上游有多少个预发布迭代
+    比它新，把结论写进 desc。
+    """
+    base_app = var.get("baseline_app")
+    if not base_app:
+        return ""
+    path = ROOT / "apps" / f"{base_app}.json"
+    if not path.is_file():
+        return ""
+    srel = (read_json(path).get("releases") or {})
+    if not srel:
+        return ""
+
+    base_v = max(srel, key=vkey)
+    ahead = [r["tag_name"] for r in rel_order
+             if r.get("prerelease") and vkey(r["tag_name"].lstrip("v")) > vkey(base_v)]
+
+    if ahead:
+        rel_txt = (f"当前基线稳定版 **{base_v}**，上游已有 **{len(ahead)} 个预发布迭代**在其之后"
+                   f"（{'、'.join(ahead[:5])}），即本条目比稳定版新。")
+    else:
+        rel_txt = (f"当前基线稳定版 **{base_v}**，上游暂无比它更新的预发布迭代"
+                   f"（作者可能已把预发布内容并入正式版），此时装稳定版即可。")
+
+    return (f"\n\n【预览版通道说明】本条目只收录上游标记为 Pre-release 的版本，"
+            f"与「稳定版」是**同一个 appid**（装了其一就不能再装其二）。{rel_txt}"
+            f"版本号带 `-N` 后缀即预发布（如 `2.11.0-3`），按 SEMVER 语义它**小于**对应的"
+            f"正式版 `2.11.0`；一旦上游把 `2.11.0` 转为正式版，稳定版条目会收录它，"
+            f"届时请以稳定版为准。")
+
+
 # ------------------------------------------------------------------ 单个版本
 
 def resolve_asset(rel: dict, var: dict):
@@ -220,7 +279,10 @@ def build_version(rel: dict, var: dict, dry_run: bool):
     version = (fields.get("version") or "").strip() or rel["tag_name"].lstrip("v")
 
     node = {
-        "changelog": split_changelog(rel.get("body") or "", var.get("changelog_from", "plain")),
+        # 前缀加在截断之后：changelog 有 500 字上限，前缀必须在额度外，否则
+        # 上游正文一长就把「这是预览版」的标记挤出去了。
+        "changelog": (var.get("changelog_prefix") or "")
+                     + split_changelog(rel.get("body") or "", var.get("changelog_from", "plain")),
         "updated_at": iso_cn(rel.get("published_at")),
         "packages": {
             var["arch"]: {
@@ -235,7 +297,7 @@ def build_version(rel: dict, var: dict, dry_run: bool):
 
 # ------------------------------------------------------------------ 详情文件
 
-def apply_header(detail: dict, var: dict, cfg: dict, fields: dict) -> None:
+def apply_header(detail: dict, var: dict, cfg: dict, fields: dict, extra_note: str = "") -> None:
     """刷新详情文件的头部元数据。
 
     分两类字段：
@@ -251,7 +313,7 @@ def apply_header(detail: dict, var: dict, cfg: dict, fields: dict) -> None:
 
     desc = (fields.get("desc") or "").strip()
     if desc:
-        detail["desc"] = desc + (var.get("desc_suffix") or "")
+        detail["desc"] = desc + (var.get("desc_suffix") or "") + (extra_note or "")
 
     if fields.get("maintainer"):
         detail["maintainer"] = fields["maintainer"].strip()
@@ -296,12 +358,28 @@ def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool) -> dict:
 
     detail = read_json(app_path)
     releases = detail.setdefault("releases", {})
-    keep = int(cfg.get("keep_versions", 10))
+    keep = int(var.get("keep_versions", cfg.get("keep_versions", 10)))
+    channel = channel_of(var, cfg)
+    suffix = var.get("version_suffix", "")
+    # 只有「需要靠 tag 认人」的变体才往节点里写 upstream_tag：正式版条目的版本键与
+    # tag 基本对应，没必要为了幂等给全部历史节点补字段（已发布元数据尽量不动）。
+    tag_tracking = bool(suffix) or channel == "prerelease"
     latest_fields: dict = {}
+
+    # 已收录标记：优先用节点里的 upstream_tag，老数据回退到版本键本身
+    seen: set = set()
+    for v, n in releases.items():
+        seen.add(v)
+        seen.add(v.lstrip("v"))
+        if isinstance(n, dict) and n.get("upstream_tag"):
+            seen.add(n["upstream_tag"])
+            seen.add(str(n["upstream_tag"]).lstrip("v"))
 
     for rel in rel_order:
         guess = rel["tag_name"].lstrip("v")
-        if guess in releases:
+        if rel["tag_name"] in seen or guess in seen:
+            continue
+        if not in_channel(rel, channel):
             continue
         # 已经收满 keep 个之后，更老的版本没必要再看（收进来也会被裁掉）
         if len(releases) >= keep and vkey(guess) < vkey(min(releases, key=vkey)):
@@ -311,6 +389,10 @@ def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool) -> dict:
         if version is None:
             stat["skipped"].append(node)  # 第二个返回值是原因
             continue
+        if suffix:
+            version = version + suffix
+        if tag_tracking:
+            node["upstream_tag"] = rel["tag_name"]
         releases[version] = node
         stat["added"].append(version)
         if fields:
@@ -321,7 +403,7 @@ def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool) -> dict:
         return stat
 
     if latest_fields:
-        apply_header(detail, var, cfg, latest_fields)
+        apply_header(detail, var, cfg, latest_fields, baseline_note(var, rel_order))
 
     stat["pruned"] = prune(releases, keep)
     write_json(app_path, detail)
@@ -331,25 +413,34 @@ def sync_variant(rel_order: list, var: dict, cfg: dict, dry_run: bool) -> dict:
 # ------------------------------------------------------------------ 主流程
 
 def load_releases(repo: str, cfg: dict) -> list:
-    """拉取上游 Release 列表，按版本号从新到旧排序。"""
+    """拉取上游 Release 列表（含 Pre-release），按版本号从新到旧排序。
+
+    只剔除 draft；是否收 Pre-release 交给每个变体自己的 channel 决定 —— 同一个上游
+    可能同时要「正式版条目」和「预览版条目」，在这一层过滤就把后者饿死了。
+    """
     data = json.loads(api_get(f"{API}/repos/{repo}/releases?per_page=100"))
     if not isinstance(data, list):
         raise RuntimeError(f"拉取 {repo} 的 Release 失败：{(data or {}).get('message')}")
 
-    # 默认只收正式版：draft 一定不发；prerelease 默认也跳过，避免把半成品收进源。
-    # 有些上游把「修了正式版 bug 的准正式版」也打成 prerelease（fnmusic 的 v2.11.0d 就是），
-    # 这种要跟进的话在配置里开 include_prerelease。
-    include_pre = bool(cfg.get("include_prerelease", False))
-    kept = []
-    for r in data:
-        if r.get("draft"):
-            continue
-        if r.get("prerelease") and not include_pre:
-            continue
-        kept.append(r)
-    data = kept
-    data.sort(key=lambda r: vkey(r["tag_name"].lstrip("v")), reverse=True)
-    return data
+    kept = [r for r in data if not r.get("draft")]
+    kept.sort(key=lambda r: vkey(r["tag_name"].lstrip("v")), reverse=True)
+    return kept
+
+
+def channel_of(var: dict, cfg: dict) -> str:
+    """变体要收哪个发布通道：stable / prerelease / all。"""
+    ch = var.get("channel")
+    if ch in ("stable", "prerelease", "all"):
+        return ch
+    # 向后兼容：老配置在顶层写 include_prerelease，等价于这个变体两个通道都收
+    return "all" if cfg.get("include_prerelease") else "stable"
+
+
+def in_channel(rel: dict, channel: str) -> bool:
+    if channel == "all":
+        return True
+    is_pre = bool(rel.get("prerelease"))
+    return is_pre if channel == "prerelease" else not is_pre
 
 
 def ensure_indexed(appid: str) -> bool:
@@ -384,7 +475,9 @@ def sync_config(path: Path, dry_run: bool, only_app: str | None) -> int:
     failed = False
     for var in variants:
         stat = sync_variant(rel_order, var, cfg, dry_run)
-        log(f"  [{stat['appid']}]")
+        vkeep = int(var.get("keep_versions") or keep)
+        log(f"  [{stat['appid']}] 通道={channel_of(var, cfg)} 保留={vkeep}"
+            + (f" 基线={var['baseline_app']}" if var.get("baseline_app") else ""))
         if stat["added"]:
             log(f"    新增版本: {', '.join(stat['added'])}")
             changed = True

@@ -21,7 +21,7 @@
     },
     "fnmedia-ext-full": {
       "details_url": "apps/fnmedia-ext-full.json",
-      "details_updated_at": "2026-10-29T11:19:21+08:00"
+      "details_updated_at": "2026-10-29T12:42:25+08:00"
     },
     "iptv": {
       "details_url": "apps/iptv.json",
@@ -30,6 +30,10 @@
     "fnmusic-ext": {
       "details_url": "apps/fnmusic-ext.json",
       "details_updated_at": "2026-10-29T12:24:04+08:00"
+    },
+    "fnmusic-ext-preview": {
+      "details_url": "apps/fnmusic-ext-preview.json",
+      "details_updated_at": "2026-10-29T12:42:33+08:00"
     }
   }
 }

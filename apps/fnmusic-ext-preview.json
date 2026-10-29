@@ -1,0 +1,32 @@
+{
+  "app_name": "fnmusic-ext-preview",
+  "display_name": "fnMusic 音源扩展（预览版）",
+  "desc": "飞牛音乐第三方音源扩展：零侵入接管官方音乐入口，提供 musicdl 聚合、网易云、洛雪自定义源在线搜索播放，内置管理页（音源切换/扫码登录/平台选择/边听边存）。\n\n【预览版通道说明】本条目只收录上游标记为 Pre-release 的版本，与「稳定版」是**同一个 appid**（装了其一就不能再装其二）。当前基线稳定版 **2.10.2**，上游已有 **1 个预发布迭代**在其之后（v2.11.0d），即本条目比稳定版新。版本号带 `-N` 后缀即预发布（如 `2.11.0-3`），按 SEMVER 语义它**小于**对应的正式版 `2.11.0`；一旦上游把 `2.11.0` 转为正式版，稳定版条目会收录它，届时请以稳定版为准。",
+  "platform": [
+    "all"
+  ],
+  "categories": [
+    "影音娱乐"
+  ],
+  "icon_url": "../assets/icons/fnmusic-ext.png",
+  "maintainer": "javycoder",
+  "maintainer_url": "https://github.com/javycoder/fnos_music_ext",
+  "distributor": "mayishidai",
+  "run_as": "root",
+  "install_type": "",
+  "is_docker": false,
+  "releases": {
+    "2.11.0-3": {
+      "changelog": "[预览版] 基线：正式版 `v2.10.2` 至本版本的累计变更。FPK 版本 `2.11.0-3`，tag / WebUI 版本 `2.11.0d`；适配飞牛音乐 `1.0.10`。 - 新增三类音源独立的播放直连 Beta（默认关闭），保留鉴权、公开 HTTPS 地址和同资源续传保护；网易已知音频 CDN 的 HTTP 地址可在有限音频探测通过后安全升级 HTTPS。权益不足、仅 HTTP 或依赖客户端不可传递请求头的资源仍可能无法直连，失败时请关闭对应开关。 - 管理页「储存」「高级」改为可折叠父菜单，移动端提供子菜单；问号帮助缩小视觉尺寸并保留触控热区，「下载音质」更名「APP下载音质」。直连管理模式暂不支持读取飞牛用户，明确提示限制并保留已保存的用户配置。 - 大模型页底部新增今日、累计及分页历史 token 用量，按北京时间保留每日记录；修复跨进程旧缓存、保存额度未同步、空响应重复计数和额度拦截误计请求，未知用量与账本异常单独提示，旧版已丢失历史无法恢复。 - 修复公共歌单名称长期显示加载中：区分服务未运行、超时、空名称与真实请求状态，提供重试及有期限的展示元数据缓存；网易榜单目录不可",
+      "updated_at": "2026-10-29T00:00:35+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/javycoder/fnos_music_ext/releases/download/v2.11.0d/fnmusic-ext-2.11.0-3.fpk",
+          "sha256": "6fbfd8b7f0a95c3cf6dfb08581122ac1162b1f176a37c36ebd47be4803b902b9",
+          "size": 28057820
+        }
+      },
+      "upstream_tag": "v2.11.0d"
+    }
+  }
+}

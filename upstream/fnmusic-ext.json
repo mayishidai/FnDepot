@@ -15,7 +15,26 @@
       "desc_suffix": "",
       "changelog_from": "plain",
       "run_as": "root",
-      "is_docker": false
+      "is_docker": false,
+      "channel": "stable"
+    },
+    {
+      "appid": "fnmusic-ext-preview",
+      "asset_suffix": ".fpk",
+      "arch": "all",
+      "categories": [
+        "影音娱乐"
+      ],
+      "icon": "../assets/icons/fnmusic-ext.png",
+      "display_name": "{manifest}（预览版）",
+      "desc_suffix": "",
+      "changelog_prefix": "[预览版] ",
+      "changelog_from": "plain",
+      "run_as": "root",
+      "is_docker": false,
+      "channel": "prerelease",
+      "keep_versions": 3,
+      "baseline_app": "fnmusic-ext"
     }
   ]
 }
