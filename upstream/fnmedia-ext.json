@@ -13,7 +13,8 @@
       "icon": "../assets/icons/fnmedia-ext.png",
       "display_name": "{manifest}",
       "desc_suffix": "",
-      "changelog_from": "plain"
+      "changelog_from": "plain",
+      "run_as": "root"
     },
     {
       "appid": "fnmedia-ext-full",
@@ -25,7 +26,8 @@
       "icon": "../assets/icons/fnmedia-ext.png",
       "display_name": "{manifest}（全功能版）",
       "desc_suffix": "（全功能版：额外包含加固源的安卓运行时并发解析等增强能力，安装包较大；轻量版请选「飞牛影视在线扩展」。）",
-      "changelog_from": "quote"
+      "changelog_from": "quote",
+      "run_as": "root"
     }
   ]
 }

@@ -12,7 +12,7 @@
   "maintainer": "yujian0815",
   "maintainer_url": "https://github.com/yujian0815/fnmedia-ext",
   "distributor": "mayishidai",
-  "run_as": "package",
+  "run_as": "root",
   "install_type": "",
   "is_docker": false,
   "releases": {
