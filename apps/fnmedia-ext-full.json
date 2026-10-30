@@ -16,39 +16,6 @@
   "install_type": "",
   "is_docker": false,
   "releases": {
-    "0.2.21": {
-      "changelog": "全功能版：全量片单预拉从“仅内置豆豆”升级为自动发现订阅内所有纯片单/元搜索型加固源（影片为 msearch 占位、自身不可搜索），识别结果持久化、新同类源自动纳入，已抓全的不重复拉取。",
-      "updated_at": "2026-10-29T09:53:58+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.21/fnmedia-ext-0.2.21-full.fpk",
-          "sha256": "2886d43206bf4c80f91551d8ebf9b4906ba3b3c8cefb5950a42e6f13bb3a6481",
-          "size": 6222672
-        }
-      }
-    },
-    "0.2.20": {
-      "changelog": "全功能版：纯片单/元搜索型加固源改为“片单与播放解析分离”——后台把完整片名目录预拉到本地并持久化，浏览/深翻页/重启均毫秒返回，点播放时才跨源匹配真实线路；末页越界不再触发实时取数。",
-      "updated_at": "2026-10-29T09:42:39+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.20/fnmedia-ext-0.2.20-full.fpk",
-          "sha256": "bacc2fc0216ad82c6a7b9448fb943e6af9d09caceaae2a9c8fdca6ab2c8a606b",
-          "size": 6221138
-        }
-      }
-    },
-    "0.2.19": {
-      "changelog": "全功能版：加固库的源文件夹与热门墙持久化到磁盘，重启/升级后约 1 秒恢复，不必再等待数分钟重新扫描；分类元数据扫描调度重写，区分真失败与“暂未初始化”，后者快速重试，源文件夹更快补齐。",
-      "updated_at": "2026-10-28T22:24:57+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.19/fnmedia-ext-0.2.19-full.fpk",
-          "sha256": "3d261108e8a90e289f194d984ec828e8fbd8e7db0da7f94aec08461f486067c9",
-          "size": 6218025
-        }
-      }
-    },
     "0.2.22": {
       "changelog": "全功能版：片单型加固源的播放聚合从单实例串行改为多安卓运行时并发池——可一键起多个互相独立的加固运行时，调用按“空闲且最快”分发、设备间真并发并带健康检查与故障转移；点片时在主力资源站并发竞速取首个可解析地址，冷片名约 3~4.5 秒、同剧切集约 1 秒。附多实例一键部署脚本。",
       "updated_at": "2026-10-29T11:06:17+08:00",
@@ -123,6 +90,39 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.26/fnmedia-ext-0.2.26-full.fpk",
           "sha256": "c5123e25017cc6571be8f04d9ad61a4ee97166e9ab4e5093ab518109d364813e",
           "size": 6316340
+        }
+      }
+    },
+    "0.2.32": {
+      "changelog": "起播更稳：识别“清单正常但分片已失效”的死链并自动换线；同名影片点选线路更准； 减少起播重复解析。个别源确实删流的影片会给出明确提示并自动尝试其他源。",
+      "updated_at": "2026-10-30T17:08:40+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.32/fnmedia-ext-0.2.32-full.fpk",
+          "sha256": "6abe6930b792e2cea520386bf29cf50d367f8e7bfbf8687d51e09089a35cc982",
+          "size": 122595216
+        }
+      }
+    },
+    "0.2.30": {
+      "changelog": "修复经外网域名访问时部分影视（长签名分片的转码流）拿到播放列表却无法加载、 黑屏/一直转圈的问题：大幅压缩播放清单体积与分片地址长度，普通在线源不受影响。",
+      "updated_at": "2026-10-30T14:33:56+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.30/fnmedia-ext-0.2.30-full.fpk",
+          "sha256": "aab0c33cdf4d3356231e3b7993b05552eefe72683f2da69651e99af583ec38e9",
+          "size": 122594998
+        }
+      }
+    },
+    "0.2.29": {
+      "changelog": "修复部分网盘影视点击后无法播放、被自动切到其他线路的问题；改善转码类视频 （mkv 等）在飞牛播放器中的兼容性与起播稳定性。",
+      "updated_at": "2026-10-30T13:47:31+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.29/fnmedia-ext-0.2.29-full.fpk",
+          "sha256": "c4d14e97496df44719cfe444c0d423b27662a0956a1b8970e77f502f27e86666",
+          "size": 122590126
         }
       }
     }
