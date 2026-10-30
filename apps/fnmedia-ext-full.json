@@ -16,17 +16,6 @@
   "install_type": "",
   "is_docker": false,
   "releases": {
-    "0.2.22": {
-      "changelog": "全功能版：片单型加固源的播放聚合从单实例串行改为多安卓运行时并发池——可一键起多个互相独立的加固运行时，调用按“空闲且最快”分发、设备间真并发并带健康检查与故障转移；点片时在主力资源站并发竞速取首个可解析地址，冷片名约 3~4.5 秒、同剧切集约 1 秒。附多实例一键部署脚本。",
-      "updated_at": "2026-10-29T11:06:17+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.22/fnmedia-ext-0.2.22-full.fpk",
-          "sha256": "dafd8f29fd6e712d1a6505dda4569dfd04cf2e28c3ff128cf6b25b6a6e00b472",
-          "size": 6227191
-        }
-      }
-    },
     "0.2.24": {
       "changelog": "全功能版：第三方网盘（夸克）播放改用与官方 App 客户端一致的在线播放接口取原画档，原画不再受 PC 网页接口单文件约 2GB 的大小限制（实测 6.7GB 电影可原画、任意进度拖动 206）；播放地址改为点播放时按文件实时换取，避免转存后短时效签名过期。",
       "updated_at": "2026-10-29T16:54:41+08:00",
@@ -35,17 +24,6 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.24/fnmedia-ext-0.2.24-full.fpk",
           "sha256": "cb47135965c338a2484e437e60a55e292ff2d986ae2b27443d925f163ec46015",
           "size": 6308169
-        }
-      }
-    },
-    "0.2.23": {
-      "changelog": "全功能版：新增第三方网盘分享的在线播放支持（MVP：夸克网盘），纯 HTTP 实现、不依赖加固运行时——插件内置自助登录页（扫码 / 粘贴 Cookie，凭据仅存本机），输入网盘分享链接（含提取码）自动转存到固定目录并取原画直链；播放由插件以带登录态的流式代理转发并透传 Range，支持拖动。加固源里的网盘分享型片源在播放时自动走该链路。",
-      "updated_at": "2026-10-29T15:52:13+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.23/fnmedia-ext-0.2.23-full.fpk",
-          "sha256": "db1e339f66d598a01ba8049f40b741779bb2c2ed5dc3d1e76f0d1fda99321866",
-          "size": 6307135
         }
       }
     },
@@ -123,6 +101,28 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.29/fnmedia-ext-0.2.29-full.fpk",
           "sha256": "c4d14e97496df44719cfe444c0d423b27662a0956a1b8970e77f502f27e86666",
           "size": 122590126
+        }
+      }
+    },
+    "0.2.35": {
+      "changelog": "海量片库更全更快：每一屏同时从多个资源站合并取片（单屏约60~80部），深翻改并发， 翻到很后面也基本不转圈；启动后自动预热前几百部，进入媒体库立刻有内容。",
+      "updated_at": "2026-10-31T01:59:09+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.35/fnmedia-ext-0.2.35-full.fpk",
+          "sha256": "dd4891844043af61e1918e5408b9097e677c13e9f9568df9c12a8eab02cdc387",
+          "size": 122623944
+        }
+      }
+    },
+    "0.2.34": {
+      "changelog": "更好认、更好选：海报上直接标出哪些是网盘高清资源、源好不好；播放时切线路， 网盘原画线路带云标并排在最前，普通在线线路在后，线路名也改成看得懂的中文。",
+      "updated_at": "2026-10-31T00:51:53+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.34/fnmedia-ext-0.2.34-full.fpk",
+          "sha256": "abf3d5ceedb083876e92454df8271eed0d923cebc103b6d16e316088579aadc8",
+          "size": 122616517
         }
       }
     }

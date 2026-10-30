@@ -16,17 +16,6 @@
   "install_type": "",
   "is_docker": false,
   "releases": {
-    "0.2.22": {
-      "changelog": "内部播放解析提效（轻量版无可见变化）。",
-      "updated_at": "2026-10-29T11:06:17+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.22/fnmedia-ext-0.2.22.fpk",
-          "sha256": "acb2eb5346094c700c8227810c047e8ff24d23b3565ad625948f272e4755908c",
-          "size": 867486
-        }
-      }
-    },
     "0.2.24": {
       "changelog": "内部播放能力改进（轻量版无可见变化）。",
       "updated_at": "2026-10-29T16:54:41+08:00",
@@ -35,17 +24,6 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.24/fnmedia-ext-0.2.24.fpk",
           "sha256": "d3e80cf3532bbe4dcf92e711fe45180bc14db2ad5724a49a0024d366b50f99bd",
           "size": 867916
-        }
-      }
-    },
-    "0.2.23": {
-      "changelog": "内部播放能力扩展（轻量版无可见变化）。",
-      "updated_at": "2026-10-29T15:52:13+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.23/fnmedia-ext-0.2.23.fpk",
-          "sha256": "d1cbee83a555f7101be81033d5064436e60fb4eecf5480b84d2ab4b48f40b2d6",
-          "size": 867793
         }
       }
     },
@@ -123,6 +101,28 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.29/fnmedia-ext-0.2.29.fpk",
           "sha256": "27692b1a4918a8b1ffda3be20e75ccecf51c684c1d6d42940c2f4dd72a895499",
           "size": 872029
+        }
+      }
+    },
+    "0.2.35": {
+      "changelog": "海量片库更全更快：每一屏同时从多个资源站合并取片（单屏约60~80部），深翻改并发， 翻到很后面也基本不转圈；启动后自动预热前几百部，进入媒体库立刻有内容。",
+      "updated_at": "2026-10-31T01:59:09+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.35/fnmedia-ext-0.2.35.fpk",
+          "sha256": "6d6efc515b895862995a79ca4e468197a27a2d6ed8c8723e53dc7590fe635547",
+          "size": 891135
+        }
+      }
+    },
+    "0.2.34": {
+      "changelog": "更好认、更好选：海报上直接标出哪些是网盘高清资源、源好不好；播放时切线路， 网盘原画线路带云标并排在最前，普通在线线路在后，线路名也改成看得懂的中文。",
+      "updated_at": "2026-10-31T00:51:53+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.34/fnmedia-ext-0.2.34.fpk",
+          "sha256": "f3ab49ec9394b6531be5f0e228d62db1a335da63457826a6a504ee030010c2c6",
+          "size": 889611
         }
       }
     }
