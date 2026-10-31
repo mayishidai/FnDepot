@@ -16,28 +16,6 @@
   "install_type": "",
   "is_docker": false,
   "releases": {
-    "0.2.24": {
-      "changelog": "全功能版：第三方网盘（夸克）播放改用与官方 App 客户端一致的在线播放接口取原画档，原画不再受 PC 网页接口单文件约 2GB 的大小限制（实测 6.7GB 电影可原画、任意进度拖动 206）；播放地址改为点播放时按文件实时换取，避免转存后短时效签名过期。",
-      "updated_at": "2026-10-29T16:54:41+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.24/fnmedia-ext-0.2.24-full.fpk",
-          "sha256": "cb47135965c338a2484e437e60a55e292ff2d986ae2b27443d925f163ec46015",
-          "size": 6308169
-        }
-      }
-    },
-    "0.2.25": {
-      "changelog": "全功能版：在线管理页新增「网盘」配置入口；网盘资源识别从夸克扩展到 UC / 阿里云盘 / 百度网盘 / 迅雷云盘 / 115 / 天翼 / 移动云盘及“四盘”聚合中转，点到暂未适配的网盘会给出明确提示而不是无效报错。",
-      "updated_at": "2026-10-30T00:25:08+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.25/fnmedia-ext-0.2.25-full.fpk",
-          "sha256": "34d2a9965e56bdf65417e977556b9c2fa6c24ce63555d67f2efb2c123823044b",
-          "size": 6312395
-        }
-      }
-    },
     "0.2.28": {
       "changelog": "全功能版：管理页「导入订阅」新增一键内置「饭太硬」源（自动解密、多镜像拉取），导入时智能区分可直接播放的在线影视源与会拖垮运行时的原生网盘/直播源并自动屏蔽后者；修复多实例并发时普通爬虫 jar 间歇加载失败，以及加固运行时冷启动偶发崩溃；网盘聚合源的夸克链接可直接转存原画播放（大文件可拖放）。",
       "updated_at": "2026-10-30T12:23:01+08:00",
@@ -57,17 +35,6 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.27/fnmedia-ext-0.2.27-full.fpk",
           "sha256": "4ebd2383aa981fca38400bfe70fccddd52fc5719d2e351a76fdc353b6c4a2f02",
           "size": 6326028
-        }
-      }
-    },
-    "0.2.26": {
-      "changelog": "全功能版：新增 UC 网盘支持，网盘配置页可在「夸克 / UC」间切换，分别扫码登录、转存并原画播放；覆盖“优夸 / 四盘”资源里的 UC 线路，并修复相关接口在部分网络下取登录二维码缓慢的问题。",
-      "updated_at": "2026-10-30T08:28:20+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.26/fnmedia-ext-0.2.26-full.fpk",
-          "sha256": "c5123e25017cc6571be8f04d9ad61a4ee97166e9ab4e5093ab518109d364813e",
-          "size": 6316340
         }
       }
     },
@@ -123,6 +90,39 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.34/fnmedia-ext-0.2.34-full.fpk",
           "sha256": "abf3d5ceedb083876e92454df8271eed0d923cebc103b6d16e316088579aadc8",
           "size": 122616517
+        }
+      }
+    },
+    "0.2.38": {
+      "changelog": "稳定性修复：修复热门/片库影片偶发“播放出错”， 搜索更稳、起播更快。",
+      "updated_at": "2026-10-31T10:08:40+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.38/fnmedia-ext-0.2.38-full.fpk",
+          "sha256": "e13b51cdb4402a7c29b583290914b7a8e35a9123c4183f332fa4328f41dc99e5",
+          "size": 122617725
+        }
+      }
+    },
+    "0.2.37": {
+      "changelog": "稳定性与浏览体验优化：媒体库分类浏览与翻页更顺、首屏更快；继续保持上一版的 回滚修复，原有片库加载正常。",
+      "updated_at": "2026-10-31T09:26:09+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.37/fnmedia-ext-0.2.37-full.fpk",
+          "sha256": "82e4261988f3b33e1b9c7bbb5f4b322090e8eb3a0f24aab0d45e2d396dce257e",
+          "size": 122615913
+        }
+      }
+    },
+    "0.2.36": {
+      "changelog": "稳定性修复：撤销上一版对媒体库翻页的实验性改动，恢复你习惯的片库加载与浏览， 升级后原有影视库正常显示；海报网盘/健康角标等功能保留。",
+      "updated_at": "2026-10-31T08:28:48+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.36/fnmedia-ext-0.2.36-full.fpk",
+          "sha256": "e22f257e7f3258966e4c8c6a0aa6a59cbb0775f36eab7bf81a4832e902d1eeb8",
+          "size": 122616902
         }
       }
     }

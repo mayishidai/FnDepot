@@ -16,28 +16,6 @@
   "install_type": "",
   "is_docker": false,
   "releases": {
-    "0.2.24": {
-      "changelog": "内部播放能力改进（轻量版无可见变化）。",
-      "updated_at": "2026-10-29T16:54:41+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.24/fnmedia-ext-0.2.24.fpk",
-          "sha256": "d3e80cf3532bbe4dcf92e711fe45180bc14db2ad5724a49a0024d366b50f99bd",
-          "size": 867916
-        }
-      }
-    },
-    "0.2.25": {
-      "changelog": "界面与识别改进（轻量版无可见变化）。",
-      "updated_at": "2026-10-30T00:25:08+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.25/fnmedia-ext-0.2.25.fpk",
-          "sha256": "179aa26fe1ed29ddd3ffa79f72e1b8b653b87e5cae7c3a3fef07997f753df10e",
-          "size": 868080
-        }
-      }
-    },
     "0.2.28": {
       "changelog": "订阅解析与运行时稳定性改进（轻量版无可见变化）。",
       "updated_at": "2026-10-30T12:23:01+08:00",
@@ -57,17 +35,6 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.27/fnmedia-ext-0.2.27.fpk",
           "sha256": "c9d86276053d559e7a4f8e49e4ff81cde04c70dec795f15951f2b10f120f9eaa",
           "size": 868317
-        }
-      }
-    },
-    "0.2.26": {
-      "changelog": "内部网盘能力扩展（轻量版无可见变化）。",
-      "updated_at": "2026-10-30T08:28:20+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.26/fnmedia-ext-0.2.26.fpk",
-          "sha256": "7df8e784fff9ca96a562b5d30d3fde4944db083ab8c2942a340582067354a21f",
-          "size": 868183
         }
       }
     },
@@ -123,6 +90,39 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.34/fnmedia-ext-0.2.34.fpk",
           "sha256": "f3ab49ec9394b6531be5f0e228d62db1a335da63457826a6a504ee030010c2c6",
           "size": 889611
+        }
+      }
+    },
+    "0.2.38": {
+      "changelog": "稳定性修复：修复热门/片库影片偶发“播放出错”， 搜索更稳、起播更快。",
+      "updated_at": "2026-10-31T10:08:40+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.38/fnmedia-ext-0.2.38.fpk",
+          "sha256": "b0e2df868e70e525eb4f6fc638c34f269186a927c197420ea3158d37b533bd35",
+          "size": 890000
+        }
+      }
+    },
+    "0.2.37": {
+      "changelog": "稳定性与浏览体验优化：媒体库分类浏览与翻页更顺、首屏更快；继续保持上一版的 回滚修复，原有片库加载正常。",
+      "updated_at": "2026-10-31T09:26:09+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.37/fnmedia-ext-0.2.37.fpk",
+          "sha256": "13a2ad17dd62aced38a51c83b9dac850664b76c8d0c4a3aa80246dc46fe21ac5",
+          "size": 889767
+        }
+      }
+    },
+    "0.2.36": {
+      "changelog": "稳定性修复：撤销上一版对媒体库翻页的实验性改动，恢复你习惯的片库加载与浏览， 升级后原有影视库正常显示；海报网盘/健康角标等功能保留。",
+      "updated_at": "2026-10-31T08:28:48+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.36/fnmedia-ext-0.2.36.fpk",
+          "sha256": "019d1ba5066bf9bf8618478218252f5fc8082586b0456db41934fbaa36266f0c",
+          "size": 889707
         }
       }
     }
