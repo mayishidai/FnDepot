@@ -27,17 +27,6 @@
         }
       }
     },
-    "0.2.27": {
-      "changelog": "全功能版：UC 网盘大文件原画播放实测打通；自动刷新网盘登录会话票据，修复一段时间后播放报 412 的问题；修复部分网络下网盘接口/取登录二维码偶发卡顿；网盘配置页新增“我的转存”，可直接浏览并播放已转存到夸克 / UC 的影片。",
-      "updated_at": "2026-10-30T09:23:05+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.27/fnmedia-ext-0.2.27-full.fpk",
-          "sha256": "4ebd2383aa981fca38400bfe70fccddd52fc5719d2e351a76fdc353b6c4a2f02",
-          "size": 6326028
-        }
-      }
-    },
     "0.2.32": {
       "changelog": "起播更稳：识别“清单正常但分片已失效”的死链并自动换线；同名影片点选线路更准； 减少起播重复解析。个别源确实删流的影片会给出明确提示并自动尝试其他源。",
       "updated_at": "2026-10-30T17:08:40+08:00",
@@ -123,6 +112,17 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.36/fnmedia-ext-0.2.36-full.fpk",
           "sha256": "e22f257e7f3258966e4c8c6a0aa6a59cbb0775f36eab7bf81a4832e902d1eeb8",
           "size": 122616902
+        }
+      }
+    },
+    "0.2.39": {
+      "changelog": "加固影视资源更稳：修复片单显示变少、部分影片取流失败， 更新可用源并增强超时容错，热门/片库播放保持顺畅。",
+      "updated_at": "2026-10-31T15:34:43+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.39/fnmedia-ext-0.2.39-full.fpk",
+          "sha256": "898952aa8bbc9abdca40160d3032fb919e8bc72bbfa82c6d5582cc8af5cc7b9b",
+          "size": 122614871
         }
       }
     }

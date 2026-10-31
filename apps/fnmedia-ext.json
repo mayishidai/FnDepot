@@ -27,17 +27,6 @@
         }
       }
     },
-    "0.2.27": {
-      "changelog": "内部网盘播放稳定性改进（轻量版无可见变化）。",
-      "updated_at": "2026-10-30T09:23:05+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.27/fnmedia-ext-0.2.27.fpk",
-          "sha256": "c9d86276053d559e7a4f8e49e4ff81cde04c70dec795f15951f2b10f120f9eaa",
-          "size": 868317
-        }
-      }
-    },
     "0.2.33": {
       "changelog": "在线源更聪明：按真实播放成功率/延迟给每个源打分，连续失败的源自动降权沉底， 又快又稳的源优先；新增纯网页嗅探，更多站点不用模拟器也能取到播放地址。 网盘扫码登录页增加会话时效提示。",
       "updated_at": "2026-10-30T17:31:31+08:00",
@@ -123,6 +112,17 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.36/fnmedia-ext-0.2.36.fpk",
           "sha256": "019d1ba5066bf9bf8618478218252f5fc8082586b0456db41934fbaa36266f0c",
           "size": 889707
+        }
+      }
+    },
+    "0.2.39": {
+      "changelog": "加固影视资源更稳：修复片单显示变少、部分影片取流失败， 更新可用源并增强超时容错，热门/片库播放保持顺畅。",
+      "updated_at": "2026-10-31T15:34:43+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.39/fnmedia-ext-0.2.39.fpk",
+          "sha256": "6f62a71fd05e4a92b236b647a3cdd69d062c90c047670e1a1de06c810815e28f",
+          "size": 890058
         }
       }
     }
