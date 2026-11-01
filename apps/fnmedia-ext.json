@@ -16,72 +16,6 @@
   "install_type": "",
   "is_docker": false,
   "releases": {
-    "0.2.28": {
-      "changelog": "订阅解析与运行时稳定性改进（轻量版无可见变化）。",
-      "updated_at": "2026-10-30T12:23:01+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.28/fnmedia-ext-0.2.28.fpk",
-          "sha256": "0fe39b22e7e35b128c676e9c9a1eabb65c36b9e460bdab03746169121599a71b",
-          "size": 871321
-        }
-      }
-    },
-    "0.2.33": {
-      "changelog": "在线源更聪明：按真实播放成功率/延迟给每个源打分，连续失败的源自动降权沉底， 又快又稳的源优先；新增纯网页嗅探，更多站点不用模拟器也能取到播放地址。 网盘扫码登录页增加会话时效提示。",
-      "updated_at": "2026-10-30T17:31:31+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.33/fnmedia-ext-0.2.33.fpk",
-          "sha256": "e7a56d5b279a6d4d718e1e1cb2c1bff715e216e0dd08fd1cad45cfd068bc5b10",
-          "size": 884694
-        }
-      }
-    },
-    "0.2.30": {
-      "changelog": "修复经外网域名访问时部分影视（长签名分片的转码流）拿到播放列表却无法加载、 黑屏/一直转圈的问题：大幅压缩播放清单体积与分片地址长度，普通在线源不受影响。",
-      "updated_at": "2026-10-30T14:33:56+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.30/fnmedia-ext-0.2.30.fpk",
-          "sha256": "e7545f361a7c1d0891cea1409f2981614033f0b38b997cd0eda5a01964d27bda",
-          "size": 873510
-        }
-      }
-    },
-    "0.2.29": {
-      "changelog": "修复部分网盘影视点击后无法播放、被自动切到其他线路的问题；改善转码类视频 （mkv 等）在飞牛播放器中的兼容性与起播稳定性。",
-      "updated_at": "2026-10-30T13:47:31+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.29/fnmedia-ext-0.2.29.fpk",
-          "sha256": "27692b1a4918a8b1ffda3be20e75ccecf51c684c1d6d42940c2f4dd72a895499",
-          "size": 872029
-        }
-      }
-    },
-    "0.2.35": {
-      "changelog": "海量片库更全更快：每一屏同时从多个资源站合并取片（单屏约60~80部），深翻改并发， 翻到很后面也基本不转圈；启动后自动预热前几百部，进入媒体库立刻有内容。",
-      "updated_at": "2026-10-31T01:59:09+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.35/fnmedia-ext-0.2.35.fpk",
-          "sha256": "6d6efc515b895862995a79ca4e468197a27a2d6ed8c8723e53dc7590fe635547",
-          "size": 891135
-        }
-      }
-    },
-    "0.2.34": {
-      "changelog": "更好认、更好选：海报上直接标出哪些是网盘高清资源、源好不好；播放时切线路， 网盘原画线路带云标并排在最前，普通在线线路在后，线路名也改成看得懂的中文。",
-      "updated_at": "2026-10-31T00:51:53+08:00",
-      "packages": {
-        "all": {
-          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.34/fnmedia-ext-0.2.34.fpk",
-          "sha256": "f3ab49ec9394b6531be5f0e228d62db1a335da63457826a6a504ee030010c2c6",
-          "size": 889611
-        }
-      }
-    },
     "0.2.38": {
       "changelog": "稳定性修复：修复热门/片库影片偶发“播放出错”， 搜索更稳、起播更快。",
       "updated_at": "2026-10-31T10:08:40+08:00",
@@ -123,6 +57,72 @@
           "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.39/fnmedia-ext-0.2.39.fpk",
           "sha256": "6f62a71fd05e4a92b236b647a3cdd69d062c90c047670e1a1de06c810815e28f",
           "size": 890058
+        }
+      }
+    },
+    "0.2.45": {
+      "changelog": "修复公开（lite）包的安装/播放阻断性问题（issue #39、#36）： - **修复 lite 包管理页「资源站 / 片源质量」一直加载、`/status` 500**： 通用的源质量权重函数 `source_priority` 之前被错误地放进私有功能剥离块， lite 包里函数被删、调用仍在，导致任何访问该路径的请求 500。 - **修复 lite 包一点播放就报错（NameError: _pan_match）**：网盘识别函数 `_pan_match` 及其正则表同样被误剥离，已移到通用区，lite/full 都可用。 - **修复干净安装 lite 后不生成 `state/config.json`**：首次启动现在会自动把 默认配置落盘，避免依赖该文件存在的接口异常。 同时包含 v0.2.44 的全部功能：逐库显示开关、媒体库自由排序（可插到本地库 前/后/中间）、子账号观看权限、饭太硬备用站自动兜底。",
+      "updated_at": "2026-11-01T12:44:55+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.45/fnmedia-ext-0.2.45.fpk",
+          "sha256": "453816bb925e03693d7ea7b397ff22afe12842834d9b64a282d7450ce5c31bb0",
+          "size": 132073108
+        }
+      }
+    },
+    "0.2.44": {
+      "changelog": "家庭多用户与媒体库管理增强： - 每张虚拟媒体库（热门榜单 / 海量片库 / 单源独立库 / 加固影视 / 网盘分类库） 都能单独「显示 / 隐藏」，隐藏后对所有账号都不出现在飞牛影视媒体库列表， 也无法通过库 guid 直接进入（返回“媒体库不存在”），随时可恢复。 - 管理页可上移 / 下移任意虚拟媒体库，自定义先后顺序； - 可一键选择虚拟媒体库整体放在**本地媒体库之前或之后**。 - 识别飞牛影视当前登录账号（只读系统账号库，无需改 App / 重新登录）， 可建立多个子账号的独立授权：为孩子/家人账号只勾选允许观看的媒体库。 - 可单独关闭某账号的「在线搜索/在线片源」：其搜索只出本地结果，不会误点播； 未配置账号走可设置的默认策略，管理员账号始终全部可见（不会把自己锁在外面）。 - 一键饭太硬在 GitHub 直连不通时，新增作者官方备用站 http://www.饭太硬.net/tv 及国内直链镜像（图片伪装订阅，自动剥离解码）， 连同原有多个加速镜像依次尝试，首个可用即用。",
+      "updated_at": "2026-11-01T11:57:00+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.44/fnmedia-ext-0.2.44.fpk",
+          "sha256": "687127ebdea7f3cd337c8e3233fb4a9c657ff7a7846f092477bfc8ae101c7d64",
+          "size": 132071354
+        }
+      }
+    },
+    "0.2.43": {
+      "changelog": "- **根因**：全局搜索会扇出到全部启用源，其中 60+ 个加固/普通爬虫/drpy 源都 依赖仅 3 台安卓运行时，相互争抢、单源会长时间不返回；而搜索请求只给很短 预算，导致整体被最慢的真机源拖到超时，在线结果为空（表现为“搜不到在线资源”）。 - **修复**：搜索框改为只聚合秒回的标准在线直链源（实测约 3 秒返回、结果齐全）， 不再被真机慢源阻塞；加固/爬虫源依旧在各自媒体库、详情与播放回源中正常使用， 可见性与可播性不受影响。 - 同时给普通爬虫 / drpy 真机源的搜索补齐与加固源一致的 8 秒硬超时，避免个别源 卡死时拖慢播放侧的全量回源。 - 搜索结果独立缓存，重复搜索即时返回。",
+      "updated_at": "2026-11-01T11:09:36+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.43/fnmedia-ext-0.2.43.fpk",
+          "sha256": "815bf58603b9a888cd1b6ac435181ef1ac453792600e9c2bc97f06593b695069",
+          "size": 132063010
+        }
+      }
+    },
+    "0.2.42": {
+      "changelog": "安装更稳：内置离线 Python 依赖并多镜像兜底，修复部分设备 安装时“Python 依赖安装失败”的问题，无网/弱网也能装好，安装后自动自检。",
+      "updated_at": "2026-11-01T10:02:25+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.42/fnmedia-ext-0.2.42.fpk",
+          "sha256": "49f9fbcfcbfa8185b4abe902c02e089938b8c38da66064b1d7488d4b87fe47ae",
+          "size": 132053541
+        }
+      }
+    },
+    "0.2.41": {
+      "changelog": "全功能版内置一键订阅所需的爬虫资源，点「一键饭太硬」离线即可导入、 首次即自动启用，并优化了导入中的进度反馈（源站慢时不再像没反应）。",
+      "updated_at": "2026-11-01T09:36:53+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.41/fnmedia-ext-0.2.41.fpk",
+          "sha256": "0ecdf09ce4ad2a34b5c2caf03e685d55504feef81551ab308fd2f6b1be27f3a8",
+          "size": 891296
+        }
+      }
+    },
+    "0.2.40": {
+      "changelog": "加固资源播放更稳：可用源自动健康轮换，失效源自动跳过、 恢复自动复用，减少第三方源波动导致的播放失败。",
+      "updated_at": "2026-11-01T09:04:36+08:00",
+      "packages": {
+        "all": {
+          "download_url": "https://github.com/yujian0815/fnmedia-ext/releases/download/v0.2.40/fnmedia-ext-0.2.40.fpk",
+          "sha256": "c031a0d00e5d98b3fdf0726f5b5d88f9594bad959d7a31843ec47b2779e20175",
+          "size": 890106
         }
       }
     }
